@@ -8,6 +8,9 @@ fires:
   2. An MQTT message arrives on --mqtt-topic         (smart-home / phone)
   3. A physical GPIO button is pressed on --gpio-pin (Pi button)
 
+Pass --manual-trigger-only to disable ML inference entirely and rely solely
+on MQTT / GPIO triggers.  In this mode --model-path is not required.
+
 This script is self-contained and does *not* depend on the parent repo's
 params.yaml.  All tunable values are exposed as CLI flags so the systemd
 unit can configure them via an EnvironmentFile.
@@ -143,10 +146,18 @@ def parse_args():
         description="Continuous audio monitor with ring buffer and multiple trigger sources"
     )
 
+    # Manual-only mode
+    parser.add_argument(
+        "--manual-trigger-only", action="store_true",
+        help="Disable ML inference and rely solely on MQTT / GPIO triggers. "
+             "When set, --model-path is not required."
+    )
+
     # Paths
     parser.add_argument(
-        "--model-path", type=str, required=True,
-        help="Path to the XGBoost model file (.json)"
+        "--model-path", type=str, default=None,
+        help="Path to the XGBoost model file (.json). "
+             "Required unless --manual-trigger-only is set."
     )
     parser.add_argument(
         "--save-dir", type=str, default="recordings",
@@ -226,6 +237,11 @@ def parse_args():
 def main():
     args = parse_args()
 
+    if not args.manual_trigger_only and args.model_path is None:
+        import sys
+        print("error: --model-path is required unless --manual-trigger-only is set", file=sys.stderr)
+        sys.exit(2)
+
     save_dir = Path(args.save_dir)
     save_dir.mkdir(parents=True, exist_ok=True)
 
@@ -277,16 +293,19 @@ def main():
 
     stream = open_stream()
 
-    # XGBoost model
-    if not os.path.exists(args.model_path):
-        log.error("Model file not found: %s", args.model_path)
-        stream.close()
-        p.terminate()
-        return
-
-    model = xgb.Booster()
-    model.load_model(args.model_path)
-    log.info("Loaded XGBoost model from %s", args.model_path)
+    # XGBoost model (not needed in manual-trigger-only mode)
+    model = None
+    if args.manual_trigger_only:
+        log.info("Manual-trigger-only mode – ML inference disabled")
+    else:
+        if not os.path.exists(args.model_path):
+            log.error("Model file not found: %s", args.model_path)
+            stream.close()
+            p.terminate()
+            return
+        model = xgb.Booster()
+        model.load_model(args.model_path)
+        log.info("Loaded XGBoost model from %s", args.model_path)
     log.info("Monitoring audio – saving to %s/", save_dir)
 
     skip_remaining = args.skip_chunks
@@ -318,6 +337,9 @@ def main():
                     continue
 
                 # ---- ML inference (throttled to every 3rd chunk) ----
+                if args.manual_trigger_only:
+                    continue
+
                 inference_counter += 1
                 if inference_counter % 3 != 0:
                     continue

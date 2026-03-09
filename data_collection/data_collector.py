@@ -145,8 +145,14 @@ def parse_args():
 
     # Paths
     parser.add_argument(
-        "--model-path", type=str, required=True,
-        help="Path to the XGBoost model file (.json)"
+        "--model-path", type=str, default=None,
+        help="Path to the XGBoost model file (.json). Required unless --no-ml-detection is set."
+    )
+
+    # ML detection toggle
+    parser.add_argument(
+        "--no-ml-detection", action="store_true",
+        help="Disable ML-based (XGBoost) detection. Only MQTT and GPIO triggers will be used."
     )
     parser.add_argument(
         "--save-dir", type=str, default="recordings",
@@ -226,6 +232,11 @@ def parse_args():
 def main():
     args = parse_args()
 
+    if not args.no_ml_detection and args.model_path is None:
+        import sys
+        print("error: --model-path is required unless --no-ml-detection is set", file=sys.stderr)
+        sys.exit(2)
+
     save_dir = Path(args.save_dir)
     save_dir.mkdir(parents=True, exist_ok=True)
 
@@ -278,15 +289,18 @@ def main():
     stream = open_stream()
 
     # XGBoost model
-    if not os.path.exists(args.model_path):
-        log.error("Model file not found: %s", args.model_path)
-        stream.close()
-        p.terminate()
-        return
-
-    model = xgb.Booster()
-    model.load_model(args.model_path)
-    log.info("Loaded XGBoost model from %s", args.model_path)
+    model = None
+    if not args.no_ml_detection:
+        if not os.path.exists(args.model_path):
+            log.error("Model file not found: %s", args.model_path)
+            stream.close()
+            p.terminate()
+            return
+        model = xgb.Booster()
+        model.load_model(args.model_path)
+        log.info("Loaded XGBoost model from %s", args.model_path)
+    else:
+        log.info("ML detection disabled – using MQTT/GPIO triggers only")
     log.info("Monitoring audio – saving to %s/", save_dir)
 
     skip_remaining = args.skip_chunks
@@ -318,26 +332,27 @@ def main():
                     continue
 
                 # ---- ML inference (throttled to every 3rd chunk) ----
-                inference_counter += 1
-                if inference_counter % 3 != 0:
-                    continue
+                if model is not None:
+                    inference_counter += 1
+                    if inference_counter % 3 != 0:
+                        continue
 
-                audio_np = np.frombuffer(data, dtype=np.int16).astype(np.float32)
-                mfccs = librosa.feature.mfcc(
-                    y=audio_np, sr=RATE, n_mfcc=args.n_mfcc, n_fft=args.n_fft
-                )
-                X = xgb.DMatrix(mfccs.flatten().reshape(1, -1))
-                prob = model.predict(X)[0]
+                    audio_np = np.frombuffer(data, dtype=np.int16).astype(np.float32)
+                    mfccs = librosa.feature.mfcc(
+                        y=audio_np, sr=RATE, n_mfcc=args.n_mfcc, n_fft=args.n_fft
+                    )
+                    X = xgb.DMatrix(mfccs.flatten().reshape(1, -1))
+                    prob = model.predict(X)[0]
 
-                if prob > args.threshold and not is_saving:
-                    is_saving = True
-                    ts = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-                    filename = save_dir / f"recording_{ts}.wav"
-                    log.info("[%s] ML trigger (p=%.3f > %.2f) – saving to %s",
-                             ts, prob, args.threshold, filename)
-                    save_audio(list(audio_buffer), stream, filename,
-                               chunk, args.post_trigger_seconds)
-                    is_saving = False
+                    if prob > args.threshold and not is_saving:
+                        is_saving = True
+                        ts = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+                        filename = save_dir / f"recording_{ts}.wav"
+                        log.info("[%s] ML trigger (p=%.3f > %.2f) – saving to %s",
+                                 ts, prob, args.threshold, filename)
+                        save_audio(list(audio_buffer), stream, filename,
+                                   chunk, args.post_trigger_seconds)
+                        is_saving = False
 
             except OSError:
                 log.warning("Buffer overflow – reopening stream")

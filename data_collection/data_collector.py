@@ -4,14 +4,13 @@ Runs indefinitely, keeping a rolling ring buffer of the last N minutes of
 audio.  A recording is saved to disk whenever any of the following triggers
 fires:
 
-  1. XGBoost model probability exceeds --threshold (ML detection)
-  2. An MQTT message arrives on --mqtt-topic  (smart-home / phone trigger)
-  3. A physical GPIO button is pressed on --gpio-pin  (Pi button trigger)
+  1. XGBoost model probability exceeds --threshold  (ML detection)
+  2. An MQTT message arrives on --mqtt-topic         (smart-home / phone)
+  3. A physical GPIO button is pressed on --gpio-pin (Pi button)
 
-Configuration
--------------
-All tuneable values are exposed as CLI flags so the systemd unit can pass
-them via an EnvironmentFile without touching this script.
+This script is self-contained and does *not* depend on the parent repo's
+params.yaml.  All tunable values are exposed as CLI flags so the systemd
+unit can configure them via an EnvironmentFile.
 """
 
 import argparse
@@ -27,10 +26,9 @@ import librosa
 import numpy as np
 import pyaudio
 import xgboost as xgb
-import yaml
 
 # ---------------------------------------------------------------------------
-# Optional dependencies – gracefully absent on non-Pi dev machines
+# Optional dependencies – absent on non-Pi dev machines
 # ---------------------------------------------------------------------------
 try:
     import paho.mqtt.client as mqtt
@@ -44,17 +42,9 @@ try:
 except ImportError:
     GPIO_AVAILABLE = False
 
-# ---------------------------------------------------------------------------
-# Audio constants (derived from params.yaml)
-# ---------------------------------------------------------------------------
-with open("params.yaml", "r") as _f:
-    _params = yaml.safe_load(_f)
-
-RATE = 16000
-WINDOW_SIZE = _params["chunk_size"] / 1000  # seconds
 CHANNELS = 1
 FORMAT = pyaudio.paInt16
-CHUNK = int(RATE * WINDOW_SIZE)  # samples per chunk
+RATE = 16000
 
 logging.basicConfig(
     level=logging.INFO,
@@ -68,12 +58,13 @@ log = logging.getLogger(__name__)
 # Audio helpers
 # ---------------------------------------------------------------------------
 
-def save_audio(buffer_snapshot: list, stream, filename: Path, post_trigger_seconds: float) -> None:
+def save_audio(buffer_snapshot: list, stream, filename: Path,
+               chunk: int, post_trigger_seconds: float) -> None:
     """Write ring-buffer contents + post-trigger audio to a WAV file."""
     frames = list(buffer_snapshot)
-    extra_chunks = int((RATE * post_trigger_seconds) / CHUNK)
+    extra_chunks = int(RATE * post_trigger_seconds / chunk)
     for _ in range(extra_chunks):
-        frames.append(stream.read(CHUNK, exception_on_overflow=False))
+        frames.append(stream.read(chunk, exception_on_overflow=False))
 
     with wave.open(str(filename), "wb") as wf:
         wf.setnchannels(CHANNELS)
@@ -81,8 +72,9 @@ def save_audio(buffer_snapshot: list, stream, filename: Path, post_trigger_secon
         wf.setframerate(RATE)
         wf.writeframes(b"".join(frames))
 
+    window_size_s = chunk / RATE
     log.info("Saved %d chunks (%.1f s) to %s",
-             len(frames), len(frames) * WINDOW_SIZE, filename)
+             len(frames), len(frames) * window_size_s, filename)
 
 
 # ---------------------------------------------------------------------------
@@ -161,7 +153,7 @@ def parse_args():
         help="Directory to save triggered recordings (default: recordings)"
     )
 
-    # Ring buffer
+    # Ring buffer & recording
     parser.add_argument(
         "--buffer-minutes", type=float, default=5.0,
         help="Ring buffer size in minutes (default: 5.0)"
@@ -169,6 +161,23 @@ def parse_args():
     parser.add_argument(
         "--post-trigger-seconds", type=float, default=7.0,
         help="Seconds of audio to record after a trigger fires (default: 7.0)"
+    )
+
+    # Audio / feature-extraction params – must match how the model was trained
+    parser.add_argument(
+        "--chunk-size-ms", type=int, default=500,
+        help="Audio window size in milliseconds (default: 500). "
+             "Must match the value used during model training."
+    )
+    parser.add_argument(
+        "--n-mfcc", type=int, default=13,
+        help="Number of MFCC coefficients (default: 13). "
+             "Must match the value used during model training."
+    )
+    parser.add_argument(
+        "--n-fft", type=int, default=512,
+        help="FFT window size for MFCC extraction (default: 512). "
+             "Must match the value used during model training."
     )
 
     # ML trigger
@@ -220,16 +229,20 @@ def main():
     save_dir = Path(args.save_dir)
     save_dir.mkdir(parents=True, exist_ok=True)
 
-    # --- Ring buffer sized for --buffer-minutes of audio ---
-    buffer_chunks = max(1, int(args.buffer_minutes * 60 / WINDOW_SIZE))
+    # Derived audio constants
+    window_size_s = args.chunk_size_ms / 1000.0
+    chunk = int(RATE * window_size_s)
+
+    # Ring buffer sized for --buffer-minutes of audio
+    buffer_chunks = max(1, int(args.buffer_minutes * 60 / window_size_s))
     audio_buffer: collections.deque = collections.deque(maxlen=buffer_chunks)
     log.info("Ring buffer: %.1f min / %d chunks (%.0f s)",
-             args.buffer_minutes, buffer_chunks, buffer_chunks * WINDOW_SIZE)
+             args.buffer_minutes, buffer_chunks, buffer_chunks * window_size_s)
 
-    # --- Shared event for out-of-band triggers ---
+    # Shared event for out-of-band triggers
     trigger_event = threading.Event()
 
-    # --- Optional trigger sources ---
+    # Optional trigger sources
     mqtt_client = None
     if args.mqtt_host:
         mqtt_client = setup_mqtt(args, trigger_event)
@@ -237,7 +250,7 @@ def main():
     if args.gpio_pin is not None:
         setup_gpio(args.gpio_pin, trigger_event)
 
-    # --- Audio device ---
+    # Audio device
     p = pyaudio.PyAudio()
 
     device_idx = None
@@ -258,13 +271,13 @@ def main():
             channels=CHANNELS,
             rate=RATE,
             input=True,
-            frames_per_buffer=CHUNK,
+            frames_per_buffer=chunk,
             input_device_index=device_idx,
         )
 
     stream = open_stream()
 
-    # --- XGBoost model ---
+    # XGBoost model
     if not os.path.exists(args.model_path):
         log.error("Model file not found: %s", args.model_path)
         stream.close()
@@ -274,20 +287,16 @@ def main():
     model = xgb.Booster()
     model.load_model(args.model_path)
     log.info("Loaded XGBoost model from %s", args.model_path)
-
-    n_mfcc = _params["feature_extraction"]["n_mfcc"]
-    n_fft = _params["feature_extraction"]["n_fft"]
-
     log.info("Monitoring audio – saving to %s/", save_dir)
 
     skip_remaining = args.skip_chunks
-    inference_counter = 0  # only run ML every 3rd chunk to reduce CPU load
+    inference_counter = 0  # run ML only every 3rd chunk to reduce CPU load
     is_saving = False       # prevent overlapping saves
 
     try:
         while True:
             try:
-                data = stream.read(CHUNK, exception_on_overflow=False)
+                data = stream.read(chunk, exception_on_overflow=False)
 
                 # Warm-up: skip initial chunks so the mic settles
                 if skip_remaining > 0:
@@ -304,9 +313,8 @@ def main():
                     filename = save_dir / f"recording_{ts}.wav"
                     log.info("[%s] Manual trigger – saving to %s", ts, filename)
                     save_audio(list(audio_buffer), stream, filename,
-                               args.post_trigger_seconds)
+                               chunk, args.post_trigger_seconds)
                     is_saving = False
-                    # Refill buffer after the blocking save
                     continue
 
                 # ---- ML inference (throttled to every 3rd chunk) ----
@@ -316,7 +324,7 @@ def main():
 
                 audio_np = np.frombuffer(data, dtype=np.int16).astype(np.float32)
                 mfccs = librosa.feature.mfcc(
-                    y=audio_np, sr=RATE, n_mfcc=n_mfcc, n_fft=n_fft
+                    y=audio_np, sr=RATE, n_mfcc=args.n_mfcc, n_fft=args.n_fft
                 )
                 X = xgb.DMatrix(mfccs.flatten().reshape(1, -1))
                 prob = model.predict(X)[0]
@@ -328,7 +336,7 @@ def main():
                     log.info("[%s] ML trigger (p=%.3f > %.2f) – saving to %s",
                              ts, prob, args.threshold, filename)
                     save_audio(list(audio_buffer), stream, filename,
-                               args.post_trigger_seconds)
+                               chunk, args.post_trigger_seconds)
                     is_saving = False
 
             except OSError:

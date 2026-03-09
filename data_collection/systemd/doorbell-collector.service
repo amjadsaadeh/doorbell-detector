@@ -21,7 +21,6 @@ EnvironmentFile=/etc/doorbell-collector.env
 # ---- Main process ----
 ExecStart=/home/pi/doorbell-detector/.venv/bin/python \
     data_collector.py \
-    --model-path            ${MODEL_PATH} \
     --save-dir              ${SAVE_DIR} \
     --buffer-minutes        ${BUFFER_MINUTES} \
     --post-trigger-seconds  ${POST_TRIGGER_SECONDS} \
@@ -30,6 +29,8 @@ ExecStart=/home/pi/doorbell-detector/.venv/bin/python \
     --n-fft                 ${N_FFT} \
     --threshold             ${THRESHOLD} \
     --skip-chunks           ${SKIP_CHUNKS} \
+    ${MANUAL_TRIGGER_ARGS} \
+    ${MODEL_PATH_ARGS} \
     ${MQTT_ARGS} \
     ${GPIO_ARGS}
 

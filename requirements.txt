@@ -100,6 +100,7 @@ numpy==1.26.4
 omegaconf==2.3.0
 orjson==3.10.10
 packaging==24.1
+paho-mqtt==2.1.0
 pandarallel==1.6.5
 pandas==2.2.3
 parso==0.8.4

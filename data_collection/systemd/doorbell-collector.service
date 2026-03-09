@@ -1,0 +1,56 @@
+[Unit]
+Description=Doorbell Detector – continuous audio collector
+Documentation=https://github.com/amjadsaadeh/doorbell-detector
+# Start after the network is up (needed for MQTT) and sound subsystem is ready
+After=network-online.target sound.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pi
+Group=pi
+
+# ---- Working directory (the data_collection sub-project) ----
+WorkingDirectory=/home/pi/doorbell-detector/data_collection
+
+# ---- Runtime configuration loaded from a separate env file ----
+# Copy data_collection/systemd/doorbell-collector.env to
+# /etc/doorbell-collector.env and edit it to match your setup.
+EnvironmentFile=/etc/doorbell-collector.env
+
+# ---- Main process ----
+ExecStart=/home/pi/doorbell-detector/.venv/bin/python \
+    data_collector.py \
+    --model-path            ${MODEL_PATH} \
+    --save-dir              ${SAVE_DIR} \
+    --buffer-minutes        ${BUFFER_MINUTES} \
+    --post-trigger-seconds  ${POST_TRIGGER_SECONDS} \
+    --chunk-size-ms         ${CHUNK_SIZE_MS} \
+    --n-mfcc                ${N_MFCC} \
+    --n-fft                 ${N_FFT} \
+    --threshold             ${THRESHOLD} \
+    --skip-chunks           ${SKIP_CHUNKS} \
+    ${MQTT_ARGS} \
+    ${GPIO_ARGS}
+
+# ---- Resilience ----
+Restart=always
+RestartSec=5
+# Give the mic time to become available after a crash
+StartLimitIntervalSec=60
+StartLimitBurst=5
+
+# ---- Resource limits (friendly on Pi Zero W) ----
+Nice=10
+# Prevent OOM-killer from killing us before other processes
+OOMScoreAdjust=-100
+
+# ---- Logging ----
+# Logs are captured by journald; view with:
+#   journalctl -u doorbell-collector -f
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=doorbell-collector
+
+[Install]
+WantedBy=multi-user.target

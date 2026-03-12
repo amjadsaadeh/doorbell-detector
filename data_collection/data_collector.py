@@ -93,6 +93,23 @@ def setup_mqtt(args, trigger_event: threading.Event):
 
     client = mqtt.Client()
 
+    if args.mqtt_username:
+        client.username_pw_set(args.mqtt_username, args.mqtt_password or None)
+        log.info("MQTT auth enabled for user '%s'", args.mqtt_username)
+
+    if args.mqtt_tls:
+        import ssl
+        client.tls_set(
+            ca_certs=args.mqtt_tls_ca,
+            certfile=args.mqtt_tls_certfile,
+            keyfile=args.mqtt_tls_keyfile,
+            tls_version=ssl.PROTOCOL_TLS,
+        )
+        if args.mqtt_tls_insecure:
+            client.tls_insecure_set(True)
+            log.warning("MQTT TLS: server certificate verification disabled")
+        log.info("MQTT TLS enabled")
+
     def on_connect(client, userdata, flags, rc):
         if rc == 0:
             client.subscribe(args.mqtt_topic)
@@ -218,6 +235,38 @@ def parse_args():
         "--mqtt-trigger-value", type=str, default=None,
         help="Expected MQTT payload to trigger a save. "
              "If omitted, any message on the topic triggers."
+    )
+
+    # MQTT authentication
+    parser.add_argument(
+        "--mqtt-username", type=str, default=None,
+        help="MQTT broker username for password-based authentication."
+    )
+    parser.add_argument(
+        "--mqtt-password", type=str, default=None,
+        help="MQTT broker password. Use together with --mqtt-username."
+    )
+
+    # MQTT TLS
+    parser.add_argument(
+        "--mqtt-tls", action="store_true",
+        help="Enable TLS/SSL for the MQTT connection."
+    )
+    parser.add_argument(
+        "--mqtt-tls-ca", type=str, default=None,
+        help="Path to the CA certificate file for TLS verification."
+    )
+    parser.add_argument(
+        "--mqtt-tls-certfile", type=str, default=None,
+        help="Path to the client certificate file for mutual TLS auth."
+    )
+    parser.add_argument(
+        "--mqtt-tls-keyfile", type=str, default=None,
+        help="Path to the client private key file for mutual TLS auth."
+    )
+    parser.add_argument(
+        "--mqtt-tls-insecure", action="store_true",
+        help="Disable TLS server certificate verification (insecure, for testing only)."
     )
 
     # GPIO trigger

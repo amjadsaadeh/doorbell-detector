@@ -32,6 +32,8 @@ ExecStart=/home/pi/doorbell-detector/.venv/bin/python \
     ${MANUAL_TRIGGER_ARGS} \
     ${MODEL_PATH_ARGS} \
     ${MQTT_ARGS} \
+    ${MQTT_AUTH_ARGS} \
+    ${MQTT_TLS_ARGS} \
     ${GPIO_ARGS}
 
 # ---- Resilience ----

@@ -46,18 +46,18 @@
 
 | REQ-ID | Phase | Status |
 |--------|-------|--------|
-| DET-01 | — | pending |
-| DET-02 | — | pending |
-| DET-03 | — | pending |
-| DET-04 | — | pending |
-| NOT-01 | — | pending |
-| NOT-02 | — | pending |
-| NOT-03 | — | pending |
-| NOT-04 | — | pending |
-| DATA-01 | — | pending |
-| DATA-02 | — | pending |
-| DATA-03 | — | pending |
-| DATA-04 | — | pending |
-| AUD-01 | — | pending |
-| AUD-02 | — | pending |
-| AUD-03 | — | pending |
+| DET-01 | Phase 1 | pending |
+| DET-02 | Phase 2 | pending |
+| DET-03 | Phase 2 | pending |
+| DET-04 | Phase 2 | pending |
+| NOT-01 | Phase 2 | pending |
+| NOT-02 | Phase 2 | pending |
+| NOT-03 | Phase 2 | pending |
+| NOT-04 | Phase 2 | pending |
+| DATA-01 | Phase 3 | pending |
+| DATA-02 | Phase 3 | pending |
+| DATA-03 | Phase 3 | pending |
+| DATA-04 | Phase 3 | pending |
+| AUD-01 | Phase 1 | pending |
+| AUD-02 | Phase 1 | pending |
+| AUD-03 | Phase 1 | pending |

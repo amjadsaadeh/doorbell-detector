@@ -30,7 +30,9 @@ Decimal phases appear between their surrounding integers in numeric order.
   2. Running with `--template missing.wav` prints a clear file-not-found error and exits non-zero
   3. Running with a valid template and no audio device prints a clear device-not-found error and exits non-zero
   4. Running with a valid template and audio device available starts without crashing and enters the capture loop
-**Plans**: TBD
+**Plans**: 1 plan
+Plans:
+- [ ] 01-01-PLAN.md — Create detector.py: CLI parsing, template loading, audio device setup, capture loop stub
 
 ### Phase 2: Detection & Notification
 **Goal**: The script detects the doorbell reliably and notifies via console and MQTT, with configurable sensitivity and duplicate suppression
@@ -62,6 +64,6 @@ Phases execute in numeric order: 1 → 2 → 3
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Script Foundation | 0/? | Not started | - |
+| 1. Script Foundation | 0/1 | Not started | - |
 | 2. Detection & Notification | 0/? | Not started | - |
 | 3. Data Collection | 0/? | Not started | - |

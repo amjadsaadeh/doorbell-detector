@@ -15,7 +15,7 @@ clip saving feature for growing the training dataset.
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [ ] **Phase 1: Script Foundation** - Audio device setup, template loading, and CLI argument scaffolding
+- [x] **Phase 1: Script Foundation** - Audio device setup, template loading, and CLI argument scaffolding (completed 2026-06-25)
 - [x] **Phase 2: Detection & Notification** - Cross-correlation loop, threshold/cooldown, console logging, and MQTT publishing (completed 2026-06-25)
 - [ ] **Phase 3: Data Collection** - Optional WAV clip saving on detection with configurable ring buffer
 
@@ -32,7 +32,7 @@ Decimal phases appear between their surrounding integers in numeric order.
   4. Running with a valid template and audio device available starts without crashing and enters the capture loop
 **Plans**: 1 plan
 Plans:
-- [ ] 01-01-PLAN.md — Create detector.py: CLI parsing, template loading, audio device setup, capture loop stub
+- [x] 01-01-PLAN.md — Create detector.py: CLI parsing, template loading, audio device setup, capture loop stub
 
 ### Phase 2: Detection & Notification
 **Goal**: The script detects the doorbell reliably and notifies via console and MQTT, with configurable sensitivity and duplicate suppression
@@ -67,6 +67,6 @@ Phases execute in numeric order: 1 → 2 → 3
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Script Foundation | 0/1 | Not started | - |
+| 1. Script Foundation | 1/1 | Complete    | 2026-06-25 |
 | 2. Detection & Notification | 2/2 | Complete    | 2026-06-25 |
 | 3. Data Collection | 0/? | Not started | - |

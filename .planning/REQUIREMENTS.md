@@ -4,7 +4,7 @@
 
 ### Detection
 
-- [ ] **DET-01**: Script loads a reference doorbell sound from a WAV file specified via `--template <path>`
+- [x] **DET-01**: Script loads a reference doorbell sound from a WAV file specified via `--template <path>`
 - [x] **DET-02**: Script continuously listens to the microphone and cross-correlates incoming audio against the template
 - [x] **DET-03**: A detection fires when the normalized cross-correlation score exceeds `--threshold` (default 0.7)
 - [x] **DET-04**: A configurable cooldown period (`--cooldown-seconds`, default 10) suppresses repeated detections after one fires
@@ -25,9 +25,9 @@
 
 ### Audio Setup
 
-- [ ] **AUD-01**: Script opens the seeed-2mic-voicecard input device (with `--device-name` override)
-- [ ] **AUD-02**: Audio is captured at 16 kHz, mono, int16 — matching the project's standard format
-- [ ] **AUD-03**: Script logs a clear error and exits gracefully if the audio device is not found or the template file is missing
+- [x] **AUD-01**: Script opens the seeed-2mic-voicecard input device (with `--device-name` override)
+- [x] **AUD-02**: Audio is captured at 16 kHz, mono, int16 — matching the project's standard format
+- [x] **AUD-03**: Script logs a clear error and exits gracefully if the audio device is not found or the template file is missing
 
 ## v2 Requirements (Deferred)
 
@@ -46,7 +46,7 @@
 
 | REQ-ID | Phase | Status |
 |--------|-------|--------|
-| DET-01 | Phase 1 | pending |
+| DET-01 | Phase 1 | Complete |
 | DET-02 | Phase 2 | Complete |
 | DET-03 | Phase 2 | Complete |
 | DET-04 | Phase 2 | Complete |
@@ -58,6 +58,6 @@
 | DATA-02 | Phase 3 | pending |
 | DATA-03 | Phase 3 | pending |
 | DATA-04 | Phase 3 | pending |
-| AUD-01 | Phase 1 | pending |
-| AUD-02 | Phase 1 | pending |
-| AUD-03 | Phase 1 | pending |
+| AUD-01 | Phase 1 | Complete |
+| AUD-02 | Phase 1 | Complete |
+| AUD-03 | Phase 1 | Complete |

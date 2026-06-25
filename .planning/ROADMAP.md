@@ -58,7 +58,9 @@ Plans:
   2. Running without `--save` produces no WAV files
   3. The saved clip contains audio from before the detection (ring buffer) plus post-trigger audio
   4. Ring buffer length and post-trigger duration are controlled by `--buffer-minutes` and `--post-trigger-seconds`
-**Plans**: TBD
+**Plans**: 1 plan
+Plans:
+- [ ] 03-01-PLAN.md — Ring buffer, post-trigger collection, and threaded WAV clip saving
 
 ## Progress
 
@@ -69,4 +71,4 @@ Phases execute in numeric order: 1 → 2 → 3
 |-------|----------------|--------|-----------|
 | 1. Script Foundation | 1/1 | Complete    | 2026-06-25 |
 | 2. Detection & Notification | 2/2 | Complete    | 2026-06-25 |
-| 3. Data Collection | 0/? | Not started | - |
+| 3. Data Collection | 0/1 | Not started | - |

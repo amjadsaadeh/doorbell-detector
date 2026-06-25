@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: ready_to_plan
-stopped_at: Phase 1 complete (1/1) — ready to discuss Phase 02
+status: ready_to_execute
+stopped_at: Phase 3 planned (1/1 plans) — ready to execute Phase 03
 last_updated: 2026-06-25T20:10:47.110Z
 last_activity: 2026-06-25
 progress:
   total_phases: 3
   completed_phases: 2
-  total_plans: 3
+  total_plans: 4
   completed_plans: 3
   percent: 67
 ---
@@ -21,16 +21,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-26)
 
 **Core value:** Detect the doorbell reliably without requiring the trained ML model — a simpler, always-available first line of detection based on what the doorbell actually sounds like.
-**Current focus:** Phase 02 — detection notification
+**Current focus:** Phase 03 — data collection (clip saving)
 
 ## Current Position
 
-Phase: 02
-Plan: Not started
-Status: Ready to plan
+Phase: 03
+Plan: 03-01-PLAN.md
+Status: Ready to execute
 Last activity: 2026-06-25
 
-Progress: [██████████] 100%
+Progress: [██████████] 100% (phases 1 and 2 complete; phase 3 planned, not yet executed)
 
 ## Performance Metrics
 
@@ -67,12 +67,15 @@ Recent decisions affecting current work:
 - Cross-correlation in time domain — simple, no training required
 - Reuse MQTT setup from data_collector.py — consistency for users
 - `--save` as optional flag — avoids filling disk during pure detection use
+- Ring buffer uses `collections.deque(maxlen=N)` — stdlib, same as data_collector.py
+- WAV writing uses stdlib `wave` module — no new pip dependencies
+- Post-trigger disk I/O runs in a daemon thread — main capture loop unblocked
 - [Phase ?]: scale-invariant score
 - [Phase ?]: monotonic clock for cooldown
 
 ### Pending Todos
 
-None yet.
+None.
 
 ### Blockers/Concerns
 
@@ -91,5 +94,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-06-25T19:35:24.167Z
-Stopped at: Roadmap created, ready to plan Phase 1
+Stopped at: Phase 3 planned — execute 03-01-PLAN.md next
 Resume file: None

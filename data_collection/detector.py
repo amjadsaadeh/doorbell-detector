@@ -12,13 +12,16 @@ Usage:
 """
 
 import argparse
+import datetime
 import logging
 import sys
-import wave
+import time
+from math import gcd
 
-import librosa
 import numpy as np
 import pyaudio
+import soundfile as sf
+from scipy.signal import resample_poly
 
 # ---------------------------------------------------------------------------
 # Audio constants — project-wide contract; do NOT change without updating all
@@ -43,15 +46,19 @@ log = logging.getLogger(__name__)
 def load_template(path: str) -> np.ndarray:
     """Load a reference doorbell WAV file and return it as a float32 array.
 
-    Uses librosa.load() with sr=RATE so the audio is automatically resampled
-    to 16 kHz if the source sample rate differs.  Returns values normalised to
-    the float32 range [-1.0, 1.0].
+    Uses soundfile to read the WAV, then resamples to RATE with scipy if the
+    source sample rate differs.  Returns values in float32 range [-1.0, 1.0].
 
     Raises:
         FileNotFoundError: if *path* does not exist.
-        Exception: for any other librosa / soundfile load error.
+        Exception: for any other soundfile load error.
     """
-    audio, _sr = librosa.load(path, sr=RATE, mono=True)
+    audio, sr = sf.read(path, dtype="float32", always_2d=False)
+    if audio.ndim > 1:
+        audio = audio.mean(axis=1).astype(np.float32)
+    if sr != RATE:
+        g = gcd(RATE, sr)
+        audio = resample_poly(audio, RATE // g, sr // g).astype(np.float32)
     return audio
 
 
@@ -71,6 +78,29 @@ def find_device(p: pyaudio.PyAudio, device_name: str):
         if device_name in info["name"] and info["maxInputChannels"] > 0:
             return i
     return None
+
+
+def compute_score(audio_bytes: bytes, template: np.ndarray) -> float:
+    """Return the peak absolute normalized cross-correlation between the audio chunk and the template.
+
+    The raw cross-correlation is normalized by the template energy so that a
+    perfect amplitude match returns a score of 1.0 regardless of the template
+    amplitude.  Silence (all-zero audio) always returns 0.0.
+
+    Args:
+        audio_bytes: Raw PCM bytes from PyAudio (16-bit signed integers, mono).
+        template: Reference doorbell waveform as a float32 array at RATE Hz.
+
+    Returns:
+        A non-negative float.  A value > 0.5 indicates a strong match.
+        Returns exactly 0.0 if the audio is silent or the template has zero energy.
+    """
+    audio = np.frombuffer(audio_bytes, dtype=np.int16).astype(np.float32)
+    corr = np.correlate(audio, template, mode='full')
+    template_energy = float(np.dot(template, template))
+    if template_energy == 0.0:
+        return 0.0
+    return float(np.max(np.abs(corr)) / template_energy)
 
 
 def parse_args() -> argparse.Namespace:
@@ -95,6 +125,18 @@ def parse_args() -> argparse.Namespace:
         type=int,
         default=500,
         help="Audio capture chunk size in milliseconds (default: 500).",
+    )
+    parser.add_argument(
+        "--threshold",
+        type=float,
+        default=0.7,
+        help="Cross-correlation score threshold for a detection to fire (default: 0.7).",
+    )
+    parser.add_argument(
+        "--cooldown-seconds",
+        type=float,
+        default=10.0,
+        help="Minimum seconds between successive detections (default: 10.0).",
     )
     return parser.parse_args()
 

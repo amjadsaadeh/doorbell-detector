@@ -68,5 +68,5 @@ Phases execute in numeric order: 1 → 2 → 3
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Script Foundation | 0/1 | Not started | - |
-| 2. Detection & Notification | 2/2 | Complete   | 2026-06-25 |
+| 2. Detection & Notification | 2/2 | Complete    | 2026-06-25 |
 | 3. Data Collection | 0/? | Not started | - |

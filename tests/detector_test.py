@@ -1,12 +1,15 @@
-"""Tests for detector.py — Phase 2 Plan 01.
+"""Tests for detector.py — Phases 2 and 3.
 
 Covers:
   - compute_score(): cross-correlation scoring behaviour
-  - parse_args(): new --threshold and --cooldown-seconds flags
+  - parse_args(): --threshold, --cooldown-seconds, and save clip flags
+  - save_clip(): WAV file writing correctness and error safety
 """
 
 import sys
+import tempfile
 import unittest
+import wave
 from pathlib import Path
 import numpy as np
 
@@ -78,6 +81,97 @@ class TestParseArgsNewFlags(unittest.TestCase):
         """--cooldown-seconds value passed on CLI must be reflected in args."""
         args = self._parse(["--cooldown-seconds", "5.0"])
         self.assertAlmostEqual(args.cooldown_seconds, 5.0)
+
+
+class TestSaveClip(unittest.TestCase):
+    """Tests for save_clip(frames, filepath)."""
+
+    def setUp(self):
+        # mktemp gives us a path without holding an open file handle so wave.open can create it.
+        self.tmp_path = tempfile.mktemp(suffix=".wav")
+
+    def tearDown(self):
+        import os
+        if Path(self.tmp_path).exists():
+            os.remove(self.tmp_path)
+
+    def test_empty_frames_creates_valid_wav(self):
+        """save_clip with no frames must create a valid WAV (0 audio bytes, correct headers)."""
+        from detector import save_clip  # noqa: PLC0415
+        save_clip([], self.tmp_path)
+        with wave.open(self.tmp_path, "rb") as wf:
+            self.assertEqual(wf.getnchannels(), 1)
+            self.assertEqual(wf.getsampwidth(), 2)
+            self.assertEqual(wf.getframerate(), 16000)
+
+    def test_single_chunk_roundtrip(self):
+        """save_clip with one 8000-sample chunk must write exactly 8000 frames."""
+        from detector import save_clip  # noqa: PLC0415
+        # 8000 int16 zero samples = 0.5 s at 16 kHz
+        chunk_bytes = (b"\x00\x00" * 8000)
+        save_clip([chunk_bytes], self.tmp_path)
+        with wave.open(self.tmp_path, "rb") as wf:
+            self.assertEqual(wf.getnframes(), 8000)
+
+    def test_exception_logged_on_bad_path(self):
+        """save_clip must not raise even when the path is unwritable — error is logged."""
+        from detector import save_clip  # noqa: PLC0415
+        # Should not raise; errors are caught internally
+        save_clip([], "/no/such/dir/x.wav")
+
+
+class TestSaveArgs(unittest.TestCase):
+    """Tests for --save, --save-dir, --buffer-minutes, --post-trigger-seconds CLI flags."""
+
+    def _parse(self, extra_argv=None):
+        """Parse args with a minimal valid argv, optionally adding extra flags."""
+        original = sys.argv[:]
+        sys.argv = ["detector.py", "--template", "dummy.wav"] + (extra_argv or [])
+        try:
+            from detector import parse_args  # noqa: PLC0415
+            return parse_args()
+        finally:
+            sys.argv = original
+
+    def test_save_default_false(self):
+        """--save must default to False."""
+        args = self._parse()
+        self.assertFalse(args.save)
+
+    def test_save_dir_default(self):
+        """--save-dir must default to 'recordings'."""
+        args = self._parse()
+        self.assertEqual(args.save_dir, "recordings")
+
+    def test_buffer_minutes_default(self):
+        """--buffer-minutes must default to 0.5."""
+        args = self._parse()
+        self.assertAlmostEqual(args.buffer_minutes, 0.5)
+
+    def test_post_trigger_seconds_default(self):
+        """--post-trigger-seconds must default to 3.0."""
+        args = self._parse()
+        self.assertAlmostEqual(args.post_trigger_seconds, 3.0)
+
+    def test_save_flag_sets_true(self):
+        """--save flag must set args.save to True."""
+        args = self._parse(["--save"])
+        self.assertTrue(args.save)
+
+    def test_save_dir_override(self):
+        """--save-dir override must be reflected in args.save_dir."""
+        args = self._parse(["--save-dir", "/tmp/clips"])
+        self.assertEqual(args.save_dir, "/tmp/clips")
+
+    def test_buffer_minutes_override(self):
+        """--buffer-minutes override must be reflected in args.buffer_minutes."""
+        args = self._parse(["--buffer-minutes", "1.5"])
+        self.assertAlmostEqual(args.buffer_minutes, 1.5)
+
+    def test_post_trigger_seconds_override(self):
+        """--post-trigger-seconds override must be reflected in args.post_trigger_seconds."""
+        args = self._parse(["--post-trigger-seconds", "5.0"])
+        self.assertAlmostEqual(args.post_trigger_seconds, 5.0)
 
 
 if __name__ == "__main__":

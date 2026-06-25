@@ -71,4 +71,4 @@ Phases execute in numeric order: 1 → 2 → 3
 |-------|----------------|--------|-----------|
 | 1. Script Foundation | 1/1 | Complete    | 2026-06-25 |
 | 2. Detection & Notification | 2/2 | Complete    | 2026-06-25 |
-| 3. Data Collection | 1/1 | Complete   | 2026-06-25 |
+| 3. Data Collection | 1/1 | Complete    | 2026-06-25 |

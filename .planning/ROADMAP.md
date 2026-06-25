@@ -17,7 +17,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Script Foundation** - Audio device setup, template loading, and CLI argument scaffolding (completed 2026-06-25)
 - [x] **Phase 2: Detection & Notification** - Cross-correlation loop, threshold/cooldown, console logging, and MQTT publishing (completed 2026-06-25)
-- [ ] **Phase 3: Data Collection** - Optional WAV clip saving on detection with configurable ring buffer
+- [x] **Phase 3: Data Collection** - Optional WAV clip saving on detection with configurable ring buffer (completed 2026-06-25)
 
 ## Phase Details
 
@@ -60,7 +60,7 @@ Plans:
   4. Ring buffer length and post-trigger duration are controlled by `--buffer-minutes` and `--post-trigger-seconds`
 **Plans**: 1 plan
 Plans:
-- [ ] 03-01-PLAN.md — Ring buffer, post-trigger collection, and threaded WAV clip saving
+- [x] 03-01-PLAN.md — Ring buffer, post-trigger collection, and threaded WAV clip saving
 
 ## Progress
 
@@ -71,4 +71,4 @@ Phases execute in numeric order: 1 → 2 → 3
 |-------|----------------|--------|-----------|
 | 1. Script Foundation | 1/1 | Complete    | 2026-06-25 |
 | 2. Detection & Notification | 2/2 | Complete    | 2026-06-25 |
-| 3. Data Collection | 0/1 | Not started | - |
+| 3. Data Collection | 1/1 | Complete   | 2026-06-25 |

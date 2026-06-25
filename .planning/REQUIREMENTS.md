@@ -18,10 +18,10 @@
 
 ### Data Collection
 
-- [ ] **DATA-01**: When `--save` flag is set, save a WAV clip (ring buffer + post-trigger audio) on each detection
-- [ ] **DATA-02**: Saved clips are written to `--save-dir` (default: `recordings/`) with timestamped filenames
-- [ ] **DATA-03**: Ring buffer size is configurable via `--buffer-minutes` (default: 0.5)
-- [ ] **DATA-04**: Post-trigger recording length is configurable via `--post-trigger-seconds` (default: 3.0)
+- [x] **DATA-01**: When `--save` flag is set, save a WAV clip (ring buffer + post-trigger audio) on each detection
+- [x] **DATA-02**: Saved clips are written to `--save-dir` (default: `recordings/`) with timestamped filenames
+- [x] **DATA-03**: Ring buffer size is configurable via `--buffer-minutes` (default: 0.5)
+- [x] **DATA-04**: Post-trigger recording length is configurable via `--post-trigger-seconds` (default: 3.0)
 
 ### Audio Setup
 
@@ -54,10 +54,10 @@
 | NOT-02 | Phase 2 | Complete |
 | NOT-03 | Phase 2 | Complete |
 | NOT-04 | Phase 2 | Complete |
-| DATA-01 | Phase 3 | pending |
-| DATA-02 | Phase 3 | pending |
-| DATA-03 | Phase 3 | pending |
-| DATA-04 | Phase 3 | pending |
+| DATA-01 | Phase 3 | Complete |
+| DATA-02 | Phase 3 | Complete |
+| DATA-03 | Phase 3 | Complete |
+| DATA-04 | Phase 3 | Complete |
 | AUD-01 | Phase 1 | Complete |
 | AUD-02 | Phase 1 | Complete |
 | AUD-03 | Phase 1 | Complete |

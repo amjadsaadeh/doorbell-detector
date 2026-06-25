@@ -12,9 +12,9 @@
 ### Notification
 
 - [x] **NOT-01**: On detection, a timestamped log message is printed to the console
-- [ ] **NOT-02**: On detection, an MQTT message is published to a configurable topic (`--mqtt-detect-topic`, default `doorbell/detected`)
-- [ ] **NOT-03**: MQTT connection supports optional username/password auth (`--mqtt-username`, `--mqtt-password`)
-- [ ] **NOT-04**: MQTT connection supports optional TLS (`--mqtt-tls`, `--mqtt-tls-ca`, `--mqtt-tls-certfile`, `--mqtt-tls-keyfile`, `--mqtt-tls-insecure`)
+- [x] **NOT-02**: On detection, an MQTT message is published to a configurable topic (`--mqtt-detect-topic`, default `doorbell/detected`)
+- [x] **NOT-03**: MQTT connection supports optional username/password auth (`--mqtt-username`, `--mqtt-password`)
+- [x] **NOT-04**: MQTT connection supports optional TLS (`--mqtt-tls`, `--mqtt-tls-ca`, `--mqtt-tls-certfile`, `--mqtt-tls-keyfile`, `--mqtt-tls-insecure`)
 
 ### Data Collection
 
@@ -51,9 +51,9 @@
 | DET-03 | Phase 2 | Complete |
 | DET-04 | Phase 2 | Complete |
 | NOT-01 | Phase 2 | Complete |
-| NOT-02 | Phase 2 | pending |
-| NOT-03 | Phase 2 | pending |
-| NOT-04 | Phase 2 | pending |
+| NOT-02 | Phase 2 | Complete |
+| NOT-03 | Phase 2 | Complete |
+| NOT-04 | Phase 2 | Complete |
 | DATA-01 | Phase 3 | pending |
 | DATA-02 | Phase 3 | pending |
 | DATA-03 | Phase 3 | pending |

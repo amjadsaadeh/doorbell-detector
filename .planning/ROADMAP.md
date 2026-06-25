@@ -16,7 +16,7 @@ clip saving feature for growing the training dataset.
 Decimal phases appear between their surrounding integers in numeric order.
 
 - [ ] **Phase 1: Script Foundation** - Audio device setup, template loading, and CLI argument scaffolding
-- [ ] **Phase 2: Detection & Notification** - Cross-correlation loop, threshold/cooldown, console logging, and MQTT publishing
+- [x] **Phase 2: Detection & Notification** - Cross-correlation loop, threshold/cooldown, console logging, and MQTT publishing (completed 2026-06-25)
 - [ ] **Phase 3: Data Collection** - Optional WAV clip saving on detection with configurable ring buffer
 
 ## Phase Details
@@ -47,7 +47,7 @@ Plans:
 **Plans**: 2 plans
 Plans:
 - [x] 02-01-PLAN.md — Detection core: compute_score(), --threshold/--cooldown-seconds, replace capture loop stub with detection + console log
-- [ ] 02-02-PLAN.md — MQTT notification: setup_mqtt_publisher(), MQTT CLI args, publish on detection, update env file and service ExecStart
+- [x] 02-02-PLAN.md — MQTT notification: setup_mqtt_publisher(), MQTT CLI args, publish on detection, update env file and service ExecStart
 
 ### Phase 3: Data Collection
 **Goal**: When `--save` is set, every detection automatically saves a WAV clip containing pre- and post-trigger audio to disk
@@ -68,5 +68,5 @@ Phases execute in numeric order: 1 → 2 → 3
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Script Foundation | 0/1 | Not started | - |
-| 2. Detection & Notification | 1/2 | In Progress|  |
+| 2. Detection & Notification | 2/2 | Complete   | 2026-06-25 |
 | 3. Data Collection | 0/? | Not started | - |

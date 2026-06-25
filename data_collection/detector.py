@@ -193,11 +193,19 @@ def main() -> None:
         args.chunk_size_ms,
     )
 
-    # -- Capture loop (Phase 1 stub: reads and discards) -------------------
+    # -- Detection state ---------------------------------------------------
+    last_detection_time: float = 0.0
+
+    # -- Capture loop ------------------------------------------------------
     try:
         while True:
             try:
-                _data = stream.read(chunk, exception_on_overflow=False)
+                data = stream.read(chunk, exception_on_overflow=False)
+                score = compute_score(data, template)
+                now = time.monotonic()
+                if score >= args.threshold and (now - last_detection_time) >= args.cooldown_seconds:
+                    last_detection_time = now
+                    log.info("Doorbell detected! score=%.4f", score)
             except OSError:
                 log.warning("Buffer overflow — stream read error, continuing")
     except KeyboardInterrupt:

@@ -1,21 +1,31 @@
-"""Pattern-matching doorbell detector — Phase 1 skeleton.
+"""Pattern-matching doorbell detector.
 
 Opens the configured audio input device, loads a reference doorbell WAV
 template (resampling to 16 kHz if needed), and enters a continuous capture
-loop that reads chunks from the microphone.  Phase 1 is a runnable skeleton:
-the capture loop reads audio and discards it.  Phase 2 will extend this with
-cross-correlation detection, threshold/cooldown logic, and MQTT notification.
+loop.  On each chunk, peak absolute normalized cross-correlation is computed
+against the template; when the score exceeds --threshold and the cooldown has
+elapsed, a detection event fires.  Detections are published to an MQTT broker
+(optional) and, when --save is active, a timestamped WAV clip is written to
+disk in a background daemon thread.  A ring buffer of pre-trigger audio is
+combined with post-trigger chunks to produce complete doorbell clips suitable
+for growing the training dataset.
 
 Usage:
     python3 detector.py --template path/to/doorbell.wav [--device-name NAME]
-                        [--chunk-size-ms MS]
+                        [--chunk-size-ms MS] [--threshold FLOAT]
+                        [--cooldown-seconds FLOAT]
+                        [--save] [--save-dir DIR]
+                        [--buffer-minutes FLOAT] [--post-trigger-seconds FLOAT]
 """
 
 import argparse
+import collections
 import datetime
 import logging
 import sys
+import threading
 import time
+import wave
 
 try:
     import paho.mqtt.client as mqtt
@@ -24,6 +34,7 @@ except ImportError:
     MQTT_AVAILABLE = False
 
 from math import gcd
+from pathlib import Path
 
 import numpy as np
 import pyaudio
@@ -108,6 +119,24 @@ def compute_score(audio_bytes: bytes, template: np.ndarray) -> float:
     if template_energy == 0.0:
         return 0.0
     return float(np.max(np.abs(corr)) / template_energy)
+
+
+def save_clip(frames: list, filepath: str) -> None:
+    """Write PCM byte buffers to a WAV file. Runs safely in a daemon thread.
+
+    Args:
+        frames: List of raw PCM byte buffers (int16, mono, RATE Hz).
+        filepath: Destination file path (must be writable).
+    """
+    try:
+        with wave.open(filepath, "wb") as wf:
+            wf.setnchannels(CHANNELS)
+            wf.setsampwidth(2)   # int16 = 2 bytes per sample
+            wf.setframerate(RATE)
+            wf.writeframes(b"".join(frames))
+        log.info("Saved WAV clip to %s (%d chunks)", filepath, len(frames))
+    except Exception as exc:
+        log.error("Failed to write clip to %s: %s", filepath, exc)
 
 
 def parse_args() -> argparse.Namespace:
@@ -204,6 +233,31 @@ def parse_args() -> argparse.Namespace:
         "--mqtt-tls-insecure",
         action="store_true",
         help="Disable TLS server certificate verification (insecure, for testing only).",
+    )
+
+    save_group = parser.add_argument_group("Save clips")
+    save_group.add_argument(
+        "--save",
+        action="store_true",
+        help="Save a WAV clip to --save-dir on each detection.",
+    )
+    save_group.add_argument(
+        "--save-dir",
+        type=str,
+        default="recordings",
+        help="Directory for saved clips (default: recordings).",
+    )
+    save_group.add_argument(
+        "--buffer-minutes",
+        type=float,
+        default=0.5,
+        help="Pre-trigger ring buffer size in minutes (default: 0.5).",
+    )
+    save_group.add_argument(
+        "--post-trigger-seconds",
+        type=float,
+        default=3.0,
+        help="Post-trigger audio duration in seconds (default: 3.0).",
     )
 
     return parser.parse_args()

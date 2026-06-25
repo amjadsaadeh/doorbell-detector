@@ -16,6 +16,13 @@ import datetime
 import logging
 import sys
 import time
+
+try:
+    import paho.mqtt.client as mqtt
+    MQTT_AVAILABLE = True
+except ImportError:
+    MQTT_AVAILABLE = False
+
 from math import gcd
 
 import numpy as np
@@ -138,7 +145,125 @@ def parse_args() -> argparse.Namespace:
         default=10.0,
         help="Minimum seconds between successive detections (default: 10.0).",
     )
+
+    mqtt_group = parser.add_argument_group("MQTT notification")
+    mqtt_group.add_argument(
+        "--mqtt-host",
+        type=str,
+        default=None,
+        help="MQTT broker hostname/IP. If omitted, MQTT notification is disabled.",
+    )
+    mqtt_group.add_argument(
+        "--mqtt-port",
+        type=int,
+        default=1883,
+        help="MQTT broker port (default: 1883).",
+    )
+    mqtt_group.add_argument(
+        "--mqtt-detect-topic",
+        type=str,
+        default="doorbell/detected",
+        help="MQTT topic to publish detections to (default: doorbell/detected).",
+    )
+    mqtt_group.add_argument(
+        "--mqtt-username",
+        type=str,
+        default=None,
+        help="MQTT broker username for password-based authentication.",
+    )
+    mqtt_group.add_argument(
+        "--mqtt-password",
+        type=str,
+        default=None,
+        help="MQTT broker password. Use with --mqtt-username.",
+    )
+    mqtt_group.add_argument(
+        "--mqtt-tls",
+        action="store_true",
+        help="Enable TLS/SSL for the MQTT connection.",
+    )
+    mqtt_group.add_argument(
+        "--mqtt-tls-ca",
+        type=str,
+        default=None,
+        help="Path to CA certificate file for TLS verification.",
+    )
+    mqtt_group.add_argument(
+        "--mqtt-tls-certfile",
+        type=str,
+        default=None,
+        help="Path to client certificate file for mutual TLS auth.",
+    )
+    mqtt_group.add_argument(
+        "--mqtt-tls-keyfile",
+        type=str,
+        default=None,
+        help="Path to client private key file for mutual TLS auth.",
+    )
+    mqtt_group.add_argument(
+        "--mqtt-tls-insecure",
+        action="store_true",
+        help="Disable TLS server certificate verification (insecure, for testing only).",
+    )
+
     return parser.parse_args()
+
+
+# ---------------------------------------------------------------------------
+# MQTT publisher
+# ---------------------------------------------------------------------------
+
+def setup_mqtt_publisher(args):
+    """Connect to an MQTT broker for publishing detection events.
+
+    Returns an mqtt.Client instance with loop_start() already running, ready
+    for publish() calls.  Returns None if paho-mqtt is not installed or if the
+    connection attempt fails (error is logged in both cases).
+    """
+    if not MQTT_AVAILABLE:
+        log.warning(
+            "paho-mqtt not installed — MQTT notification disabled. "
+            "Install with: pip install paho-mqtt"
+        )
+        return None
+
+    client = mqtt.Client()
+
+    if args.mqtt_username:
+        client.username_pw_set(args.mqtt_username, args.mqtt_password or None)
+        log.info("MQTT auth enabled for user '%s'", args.mqtt_username)
+
+    if args.mqtt_tls:
+        import ssl
+        client.tls_set(
+            ca_certs=args.mqtt_tls_ca,
+            certfile=args.mqtt_tls_certfile,
+            keyfile=args.mqtt_tls_keyfile,
+            tls_version=ssl.PROTOCOL_TLS,
+        )
+        if args.mqtt_tls_insecure:
+            client.tls_insecure_set(True)
+            log.warning("MQTT TLS: server certificate verification disabled")
+        log.info("MQTT TLS enabled")
+
+    def on_connect(client, userdata, flags, rc):
+        if rc == 0:
+            log.info("MQTT connected to %s:%d", args.mqtt_host, args.mqtt_port)
+        else:
+            log.error("MQTT connection failed (rc=%d)", rc)
+
+    client.on_connect = on_connect
+
+    try:
+        client.connect(args.mqtt_host, args.mqtt_port, keepalive=60)
+        client.loop_start()
+        return client
+    except Exception as exc:
+        log.error(
+            "Failed to connect to MQTT broker at %s:%d — %s",
+            args.mqtt_host, args.mqtt_port, exc,
+        )
+        return None
 
 
 # ---------------------------------------------------------------------------

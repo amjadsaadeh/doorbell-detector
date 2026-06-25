@@ -341,7 +341,21 @@ def main() -> None:
     log.info("Loaded template from %s (%d samples)", args.template, len(template))
 
     # -- Derived constants -------------------------------------------------
-    chunk = int(RATE * args.chunk_size_ms / 1000)
+    chunk_size_s = args.chunk_size_ms / 1000.0
+    chunk = int(RATE * chunk_size_s)
+
+    # -- Save mode setup ---------------------------------------------------
+    if args.save:
+        save_dir = Path(args.save_dir)
+        save_dir.mkdir(parents=True, exist_ok=True)
+        buffer_chunks = max(1, int(args.buffer_minutes * 60 / chunk_size_s))
+        ring_buf: collections.deque = collections.deque(maxlen=buffer_chunks)
+        log.info(
+            "Save mode enabled — ring buffer %.1f min (%d chunks), post-trigger %.1f s",
+            args.buffer_minutes, buffer_chunks, args.post_trigger_seconds,
+        )
+    else:
+        ring_buf = None
 
     # -- PyAudio init + device discovery -----------------------------------
     p = pyaudio.PyAudio()
@@ -383,6 +397,8 @@ def main() -> None:
         while True:
             try:
                 data = stream.read(chunk, exception_on_overflow=False)
+                if ring_buf is not None:
+                    ring_buf.append(data)
                 score = compute_score(data, template)
                 now = time.monotonic()
                 if score >= args.threshold and (now - last_detection_time) >= args.cooldown_seconds:
@@ -390,6 +406,27 @@ def main() -> None:
                     log.info("Doorbell detected! score=%.4f", score)
                     if mqtt_client is not None:
                         mqtt_client.publish(args.mqtt_detect_topic, datetime.datetime.now().isoformat())
+                    if args.save and ring_buf is not None:
+                        ts = datetime.datetime.now().strftime("doorbell_%Y%m%d_%H%M%S.wav")
+                        filepath = str(save_dir / ts)
+                        pre_frames = list(ring_buf)
+                        post_chunks = max(1, int(args.post_trigger_seconds / chunk_size_s))
+                        post_frames = []
+                        for _ in range(post_chunks):
+                            try:
+                                post_frames.append(stream.read(chunk, exception_on_overflow=False))
+                            except OSError:
+                                log.warning("Buffer overflow during post-trigger collection")
+                                break
+                        threading.Thread(
+                            target=save_clip,
+                            args=(pre_frames + post_frames, filepath),
+                            daemon=True,
+                        ).start()
+                        log.info(
+                            "Saving clip %s (%d pre + %d post chunks)",
+                            filepath, len(pre_frames), len(post_frames),
+                        )
             except OSError:
                 log.warning("Buffer overflow — stream read error, continuing")
     except KeyboardInterrupt:

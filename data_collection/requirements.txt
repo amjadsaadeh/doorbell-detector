@@ -4,8 +4,9 @@
 #
 # RPi.GPIO is Pi-only; omit on a dev machine.
 
-librosa==0.10.2.post1
 numpy==1.26.4
+scipy>=1.2.0
+soundfile>=0.12.1
 paho-mqtt==2.1.0
 PyAudio==0.2.14
 PyYAML==6.0.2

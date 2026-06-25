@@ -1,0 +1,57 @@
+[Unit]
+Description=Doorbell Detector – pattern-matching audio detector
+Documentation=https://github.com/amjadsaadeh/doorbell-detector
+# Start after the network is up (needed for MQTT in Phase 2) and sound subsystem is ready
+After=network-online.target sound.target
+Wants=network-online.target
+StartLimitIntervalSec=60
+StartLimitBurst=5
+
+[Service]
+Type=simple
+User=pi
+Group=pi
+
+# ---- Working directory (the data_collection sub-project) ----
+WorkingDirectory=/home/pi/doorbell-detector/data_collection
+
+# ---- Runtime configuration loaded from a separate env file ----
+# Copy data_collection/systemd/doorbell-detector.env to
+# /etc/doorbell-detector.env and edit it to match your setup.  Then reload:
+#
+#   sudo systemctl daemon-reload
+#   sudo systemctl restart doorbell-detector
+#
+EnvironmentFile=/etc/doorbell-detector.env
+
+# ---- Main process ----
+# MQTT notification — values come from EnvironmentFile; leave MQTT_HOST blank to disable
+ExecStart=/home/pi/doorbell-detector/data_collection/.venv/bin/python \
+    detector.py \
+    --template     ${TEMPLATE} \
+    --device-name  ${DEVICE_NAME} \
+    --chunk-size-ms ${CHUNK_SIZE_MS} \
+    --mqtt-host      ${MQTT_HOST} \
+    --mqtt-port      ${MQTT_PORT} \
+    --mqtt-detect-topic ${MQTT_DETECT_TOPIC} \
+    --mqtt-username  ${MQTT_USERNAME} \
+    --mqtt-password  ${MQTT_PASSWORD}
+
+# ---- Resilience ----
+Restart=always
+RestartSec=5
+
+# ---- Resource limits (friendly on Pi Zero W) ----
+Nice=10
+# Prevent OOM-killer from killing us before other processes
+OOMScoreAdjust=-100
+
+# ---- Logging ----
+# Logs are captured by journald; view with:
+#   journalctl -u doorbell-detector -f
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=doorbell-detector
+
+[Install]
+WantedBy=multi-user.target

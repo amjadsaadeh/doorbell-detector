@@ -303,6 +303,9 @@ def main() -> None:
         p.get_device_info_by_index(device_idx)["name"],
     )
 
+    # -- MQTT publisher (optional) -----------------------------------------
+    mqtt_client = setup_mqtt_publisher(args) if args.mqtt_host else None
+
     # -- Stream open -------------------------------------------------------
     stream = p.open(
         format=FORMAT,
@@ -331,6 +334,8 @@ def main() -> None:
                 if score >= args.threshold and (now - last_detection_time) >= args.cooldown_seconds:
                     last_detection_time = now
                     log.info("Doorbell detected! score=%.4f", score)
+                    if mqtt_client is not None:
+                        mqtt_client.publish(args.mqtt_detect_topic, datetime.datetime.now().isoformat())
             except OSError:
                 log.warning("Buffer overflow — stream read error, continuing")
     except KeyboardInterrupt:
@@ -339,6 +344,9 @@ def main() -> None:
         stream.stop_stream()
         stream.close()
         p.terminate()
+        if mqtt_client is not None:
+            mqtt_client.loop_stop()
+            mqtt_client.disconnect()
 
 
 if __name__ == "__main__":

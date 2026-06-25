@@ -4,13 +4,13 @@ milestone: v1.0
 milestone_name: milestone
 status: executing
 stopped_at: Roadmap created, ready to plan Phase 1
-last_updated: "2026-06-25T19:21:10.774Z"
-last_activity: 2026-06-25 -- Phase 2 planning complete
+last_updated: "2026-06-25T19:26:54.215Z"
+last_activity: 2026-06-25
 progress:
   total_phases: 3
   completed_phases: 1
   total_plans: 3
-  completed_plans: 1
+  completed_plans: 2
   percent: 33
 ---
 
@@ -21,16 +21,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-26)
 
 **Core value:** Detect the doorbell reliably without requiring the trained ML model — a simpler, always-available first line of detection based on what the doorbell actually sounds like.
-**Current focus:** Phase 1 — Script Foundation
+**Current focus:** Phase 2 — Detection & Notification
 
 ## Current Position
 
-Phase: 1 of 3 (Script Foundation)
-Plan: 0 of 1 in current phase
+Phase: 2 (Detection & Notification) — EXECUTING
+Plan: 2 of 2
 Status: Ready to execute
-Last activity: 2026-06-25 -- Phase 2 planning complete
+Last activity: 2026-06-25
 
-Progress: [░░░░░░░░░░] 0%
+Progress: [███████░░░] 67%
 
 ## Performance Metrics
 
@@ -52,6 +52,7 @@ Progress: [░░░░░░░░░░] 0%
 - Trend: —
 
 *Updated after each plan completion*
+| Phase 02-detection-notification P01 | 3min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -64,6 +65,8 @@ Recent decisions affecting current work:
 - Cross-correlation in time domain — simple, no training required
 - Reuse MQTT setup from data_collector.py — consistency for users
 - `--save` as optional flag — avoids filling disk during pure detection use
+- [Phase ?]: scale-invariant score
+- [Phase ?]: monotonic clock for cooldown
 
 ### Pending Todos
 
@@ -85,6 +88,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-05-26
+Last session: 2026-06-25T19:26:45.252Z
 Stopped at: Roadmap created, ready to plan Phase 1
 Resume file: None

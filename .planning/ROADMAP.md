@@ -46,7 +46,7 @@ Plans:
   5. The script connects over TLS when `--mqtt-tls` is passed, using the provided CA/cert/key flags
 **Plans**: 2 plans
 Plans:
-- [ ] 02-01-PLAN.md — Detection core: compute_score(), --threshold/--cooldown-seconds, replace capture loop stub with detection + console log
+- [x] 02-01-PLAN.md — Detection core: compute_score(), --threshold/--cooldown-seconds, replace capture loop stub with detection + console log
 - [ ] 02-02-PLAN.md — MQTT notification: setup_mqtt_publisher(), MQTT CLI args, publish on detection, update env file and service ExecStart
 
 ### Phase 3: Data Collection
@@ -68,5 +68,5 @@ Phases execute in numeric order: 1 → 2 → 3
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Script Foundation | 0/1 | Not started | - |
-| 2. Detection & Notification | 0/2 | Not started | - |
+| 2. Detection & Notification | 1/2 | In Progress|  |
 | 3. Data Collection | 0/? | Not started | - |

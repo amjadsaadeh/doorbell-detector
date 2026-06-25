@@ -5,13 +5,13 @@
 ### Detection
 
 - [ ] **DET-01**: Script loads a reference doorbell sound from a WAV file specified via `--template <path>`
-- [ ] **DET-02**: Script continuously listens to the microphone and cross-correlates incoming audio against the template
-- [ ] **DET-03**: A detection fires when the normalized cross-correlation score exceeds `--threshold` (default 0.7)
-- [ ] **DET-04**: A configurable cooldown period (`--cooldown-seconds`, default 10) suppresses repeated detections after one fires
+- [x] **DET-02**: Script continuously listens to the microphone and cross-correlates incoming audio against the template
+- [x] **DET-03**: A detection fires when the normalized cross-correlation score exceeds `--threshold` (default 0.7)
+- [x] **DET-04**: A configurable cooldown period (`--cooldown-seconds`, default 10) suppresses repeated detections after one fires
 
 ### Notification
 
-- [ ] **NOT-01**: On detection, a timestamped log message is printed to the console
+- [x] **NOT-01**: On detection, a timestamped log message is printed to the console
 - [ ] **NOT-02**: On detection, an MQTT message is published to a configurable topic (`--mqtt-detect-topic`, default `doorbell/detected`)
 - [ ] **NOT-03**: MQTT connection supports optional username/password auth (`--mqtt-username`, `--mqtt-password`)
 - [ ] **NOT-04**: MQTT connection supports optional TLS (`--mqtt-tls`, `--mqtt-tls-ca`, `--mqtt-tls-certfile`, `--mqtt-tls-keyfile`, `--mqtt-tls-insecure`)
@@ -47,10 +47,10 @@
 | REQ-ID | Phase | Status |
 |--------|-------|--------|
 | DET-01 | Phase 1 | pending |
-| DET-02 | Phase 2 | pending |
-| DET-03 | Phase 2 | pending |
-| DET-04 | Phase 2 | pending |
-| NOT-01 | Phase 2 | pending |
+| DET-02 | Phase 2 | Complete |
+| DET-03 | Phase 2 | Complete |
+| DET-04 | Phase 2 | Complete |
+| NOT-01 | Phase 2 | Complete |
 | NOT-02 | Phase 2 | pending |
 | NOT-03 | Phase 2 | pending |
 | NOT-04 | Phase 2 | pending |

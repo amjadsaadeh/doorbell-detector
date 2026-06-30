@@ -234,6 +234,18 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Disable TLS server certificate verification (insecure, for testing only).",
     )
+    mqtt_group.add_argument(
+        "--mqtt-trigger-topic",
+        type=str,
+        default=None,
+        help="MQTT topic to subscribe to for manual recording trigger. Requires --save.",
+    )
+    mqtt_group.add_argument(
+        "--mqtt-trigger-value",
+        type=str,
+        default=None,
+        help="Expected payload to trigger recording. If omitted, any message on the topic triggers.",
+    )
 
     save_group = parser.add_argument_group("Save clips")
     save_group.add_argument(
@@ -267,12 +279,15 @@ def parse_args() -> argparse.Namespace:
 # MQTT publisher
 # ---------------------------------------------------------------------------
 
-def setup_mqtt_publisher(args):
+def setup_mqtt_publisher(args, trigger_event=None):
     """Connect to an MQTT broker for publishing detection events.
 
     Returns an mqtt.Client instance with loop_start() already running, ready
     for publish() calls.  Returns None if paho-mqtt is not installed or if the
     connection attempt fails (error is logged in both cases).
+
+    If trigger_event is provided and args.mqtt_trigger_topic is set, also
+    subscribes to that topic and sets trigger_event on each matching message.
     """
     if not MQTT_AVAILABLE:
         log.warning(
@@ -303,10 +318,21 @@ def setup_mqtt_publisher(args):
     def on_connect(client, userdata, flags, rc):
         if rc == 0:
             log.info("MQTT connected to %s:%d", args.mqtt_host, args.mqtt_port)
+            if args.mqtt_trigger_topic:
+                client.subscribe(args.mqtt_trigger_topic)
+                log.info("MQTT subscribed to trigger topic '%s'", args.mqtt_trigger_topic)
         else:
             log.error("MQTT connection failed (rc=%d)", rc)
 
+    def on_message(client, userdata, msg):
+        payload = msg.payload.decode(errors="replace").strip()
+        if args.mqtt_trigger_value is None or payload == args.mqtt_trigger_value:
+            log.info("MQTT trigger received on '%s': '%s'", msg.topic, payload)
+            if trigger_event is not None:
+                trigger_event.set()
+
     client.on_connect = on_connect
+    client.on_message = on_message
 
     try:
         client.connect(args.mqtt_host, args.mqtt_port, keepalive=60)
@@ -371,8 +397,9 @@ def main() -> None:
         p.get_device_info_by_index(device_idx)["name"],
     )
 
-    # -- MQTT publisher (optional) -----------------------------------------
-    mqtt_client = setup_mqtt_publisher(args) if args.mqtt_host else None
+    # -- MQTT publisher + optional trigger subscriber ----------------------
+    trigger_event = threading.Event()
+    mqtt_client = setup_mqtt_publisher(args, trigger_event) if args.mqtt_host else None
 
     # -- Stream open -------------------------------------------------------
     stream = p.open(
@@ -399,6 +426,34 @@ def main() -> None:
                 data = stream.read(chunk, exception_on_overflow=False)
                 if ring_buf is not None:
                     ring_buf.append(data)
+
+                if trigger_event.is_set():
+                    trigger_event.clear()
+                    if args.save and ring_buf is not None:
+                        ts = datetime.datetime.now().strftime("doorbell_%Y%m%d_%H%M%S.wav")
+                        filepath = str(save_dir / ts)
+                        pre_frames = list(ring_buf)
+                        post_chunks = max(1, int(args.post_trigger_seconds / chunk_size_s))
+                        post_frames = []
+                        for _ in range(post_chunks):
+                            try:
+                                post_frames.append(stream.read(chunk, exception_on_overflow=False))
+                            except OSError:
+                                log.warning("Buffer overflow during post-trigger collection")
+                                break
+                        threading.Thread(
+                            target=save_clip,
+                            args=(pre_frames + post_frames, filepath),
+                            daemon=True,
+                        ).start()
+                        log.info(
+                            "Saving clip %s (%d pre + %d post chunks)",
+                            filepath, len(pre_frames), len(post_frames),
+                        )
+                    else:
+                        log.warning("MQTT trigger received but --save is not active; ignoring")
+                    continue
+
                 score = compute_score(data, template)
                 now = time.monotonic()
                 if score >= args.threshold and (now - last_detection_time) >= args.cooldown_seconds:

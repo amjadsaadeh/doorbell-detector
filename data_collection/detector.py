@@ -22,6 +22,7 @@ import argparse
 import collections
 import datetime
 import logging
+import os
 import sys
 import threading
 import time
@@ -265,14 +266,14 @@ def parse_args() -> argparse.Namespace:
     save_group.add_argument(
         "--buffer-minutes",
         type=float,
-        default=0.5,
-        help="Pre-trigger ring buffer size in minutes (default: 0.5).",
+        default=float(os.environ.get("BUFFER_SECONDS", 3)) / 60,
+        help="Pre-trigger ring buffer size in minutes (default: from BUFFER_SECONDS env var in seconds / 60, or 3s = 0.05min).",
     )
     save_group.add_argument(
         "--post-trigger-seconds",
         type=float,
-        default=3.0,
-        help="Post-trigger audio duration in seconds (default: 3.0).",
+        default=float(os.environ.get("POST_TRIGGER_MINUTES", 0.1)) * 60,
+        help="Post-trigger audio duration in seconds (default: from POST_TRIGGER_MINUTES env var in minutes * 60, or 0.1min = 6s).",
     )
 
     return parser.parse_args()

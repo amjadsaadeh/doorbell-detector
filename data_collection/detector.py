@@ -134,7 +134,10 @@ def save_clip(frames: list, filepath: str) -> None:
             wf.setsampwidth(2)   # int16 = 2 bytes per sample
             wf.setframerate(RATE)
             wf.writeframes(b"".join(frames))
-        log.info("Saved WAV clip to %s (%d chunks)", filepath, len(frames))
+        total_bytes = len(b"".join(frames))
+        total_samples = total_bytes // 2  # int16 = 2 bytes per sample
+        total_seconds = total_samples / RATE
+        log.info("Saved WAV clip to %s (%d chunks, %.2f s)", filepath, len(frames), total_seconds)
     except Exception as exc:
         log.error("Failed to write clip to %s: %s", filepath, exc)
 
@@ -364,7 +367,7 @@ def main() -> None:
         log.error("Failed to load template '%s': %s", args.template, exc)
         sys.exit(1)
 
-    log.info("Loaded template from %s (%d samples)", args.template, len(template))
+    log.info("Loaded template from %s (%d samples, %.2f s)", args.template, len(template), len(template) / RATE)
 
     # -- Derived constants -------------------------------------------------
     chunk_size_s = args.chunk_size_ms / 1000.0
@@ -411,9 +414,10 @@ def main() -> None:
         input_device_index=device_idx,
     )
     log.info(
-        "Capture loop started — chunk=%d samples (%.0f ms), Ctrl-C to stop",
+        "Capture loop started — chunk=%d samples (%.0f ms, %.2f s), Ctrl-C to stop",
         chunk,
         args.chunk_size_ms,
+        chunk / RATE,
     )
 
     # -- Detection state ---------------------------------------------------
@@ -446,9 +450,10 @@ def main() -> None:
                             args=(pre_frames + post_frames, filepath),
                             daemon=True,
                         ).start()
+                        total_seconds = (len(pre_frames) + len(post_frames)) * chunk_size_s
                         log.info(
-                            "Saving clip %s (%d pre + %d post chunks)",
-                            filepath, len(pre_frames), len(post_frames),
+                            "Saving clip %s (%d pre + %d post chunks, %.2f s)",
+                            filepath, len(pre_frames), len(post_frames), total_seconds,
                         )
                     else:
                         log.warning("MQTT trigger received but --save is not active; ignoring")
@@ -478,9 +483,10 @@ def main() -> None:
                             args=(pre_frames + post_frames, filepath),
                             daemon=True,
                         ).start()
+                        total_seconds = (len(pre_frames) + len(post_frames)) * chunk_size_s
                         log.info(
-                            "Saving clip %s (%d pre + %d post chunks)",
-                            filepath, len(pre_frames), len(post_frames),
+                            "Saving clip %s (%d pre + %d post chunks, %.2f s)",
+                            filepath, len(pre_frames), len(post_frames), total_seconds,
                         )
             except OSError:
                 log.warning("Buffer overflow — stream read error, continuing")

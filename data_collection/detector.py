@@ -114,7 +114,7 @@ def compute_score(audio_bytes: bytes, template: np.ndarray) -> float:
         A non-negative float.  A value > 0.5 indicates a strong match.
         Returns exactly 0.0 if the audio is silent or the template has zero energy.
     """
-    audio = np.frombuffer(audio_bytes, dtype=np.int16).astype(np.float32)
+    audio = np.frombuffer(audio_bytes, dtype=np.int16).astype(np.float32) / 32768.0
     corr = np.correlate(audio, template, mode='full')
     template_energy = float(np.dot(template, template))
     if template_energy == 0.0:
@@ -375,8 +375,8 @@ def main() -> None:
     chunk = int(RATE * chunk_size_s)
 
     # -- Save mode setup ---------------------------------------------------
+    save_dir = Path(args.save_dir) if args.save else None
     if args.save:
-        save_dir = Path(args.save_dir)
         save_dir.mkdir(parents=True, exist_ok=True)
         buffer_chunks = max(1, int(args.buffer_minutes * 60 / chunk_size_s))
         ring_buf: collections.deque = collections.deque(maxlen=buffer_chunks)
@@ -453,7 +453,7 @@ def main() -> None:
                         ).start()
                         total_seconds = (len(pre_frames) + len(post_frames)) * chunk_size_s
                         log.info(
-                            "Saving clip %s (%d pre + %d post chunks, %.2f s)",
+                            "Saving clip %s (MQTT trigger) (%d pre + %d post chunks, %.2f s)",
                             filepath, len(pre_frames), len(post_frames), total_seconds,
                         )
                     else:
@@ -486,7 +486,7 @@ def main() -> None:
                         ).start()
                         total_seconds = (len(pre_frames) + len(post_frames)) * chunk_size_s
                         log.info(
-                            "Saving clip %s (%d pre + %d post chunks, %.2f s)",
+                            "Saving clip %s (detection) (%d pre + %d post chunks, %.2f s)",
                             filepath, len(pre_frames), len(post_frames), total_seconds,
                         )
             except OSError:

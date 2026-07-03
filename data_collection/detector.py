@@ -40,7 +40,7 @@ from pathlib import Path
 import numpy as np
 import pyaudio
 import soundfile as sf
-from scipy.signal import resample_poly
+from scipy.signal import correlate, resample_poly
 
 # ---------------------------------------------------------------------------
 # Audio constants — project-wide contract; do NOT change without updating all
@@ -115,7 +115,7 @@ def compute_score(audio_bytes: bytes, template: np.ndarray) -> float:
         Returns exactly 0.0 if the audio is silent or the template has zero energy.
     """
     audio = np.frombuffer(audio_bytes, dtype=np.int16).astype(np.float32) / 32768.0
-    corr = np.correlate(audio, template, mode='full')
+    corr = correlate(audio, template, mode='full', method='fft')
     template_energy = float(np.dot(template, template))
     if template_energy == 0.0:
         return 0.0
@@ -435,7 +435,7 @@ def main() -> None:
                 if trigger_event.is_set():
                     trigger_event.clear()
                     if args.save and ring_buf is not None:
-                        ts = datetime.datetime.now().strftime("doorbell_%Y%m%d_%H%M%S.wav")
+                        ts = datetime.datetime.now().strftime("doorbell_manual_%Y%m%d_%H%M%S.wav")
                         filepath = str(save_dir / ts)
                         pre_frames = list(ring_buf)
                         post_chunks = max(1, int(args.post_trigger_seconds / chunk_size_s))

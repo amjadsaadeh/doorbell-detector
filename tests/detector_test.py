@@ -2,6 +2,7 @@
 
 Covers:
   - compute_score(): cross-correlation scoring behaviour
+  - select_template_window(): energetic-window trim selection
   - parse_args(): --threshold, --cooldown-seconds, and save clip flags
   - save_clip(): WAV file writing correctness and error safety
 """
@@ -47,6 +48,56 @@ class TestComputeScore(unittest.TestCase):
         audio = np.zeros(8000, dtype=np.int16).tobytes()
         result = compute_score(audio, self.template)
         self.assertIsInstance(result, float)
+
+
+class TestSelectTemplateWindow(unittest.TestCase):
+    """Tests for select_template_window(template, target_samples)."""
+
+    def test_template_shorter_than_target_returned_unchanged(self):
+        """A template already shorter than target_samples must pass through untouched."""
+        from detector import select_template_window  # noqa: PLC0415
+        template = np.ones(4000, dtype=np.float32)
+        windowed, start, end = select_template_window(template, 8000)
+        np.testing.assert_array_equal(windowed, template)
+        self.assertEqual(start, 0)
+        self.assertEqual(end, 4000)
+
+    def test_template_equal_to_target_returned_unchanged(self):
+        """A template exactly target_samples long must pass through untouched."""
+        from detector import select_template_window  # noqa: PLC0415
+        template = np.ones(8000, dtype=np.float32)
+        windowed, start, end = select_template_window(template, 8000)
+        np.testing.assert_array_equal(windowed, template)
+        self.assertEqual(start, 0)
+        self.assertEqual(end, 8000)
+
+    def test_selects_highest_energy_window(self):
+        """A loud burst inside a longer silent template must be the selected window."""
+        from detector import select_template_window  # noqa: PLC0415
+        template = np.zeros(24000, dtype=np.float32)  # 1.5 s of silence
+        burst_start = 16000  # loud region starts at 1.0 s
+        template[burst_start:burst_start + 4000] = 1.0  # 0.25 s loud burst
+        windowed, start, end = select_template_window(template, 4000)
+        self.assertEqual(start, burst_start)
+        self.assertEqual(end, burst_start + 4000)
+        self.assertEqual(len(windowed), 4000)
+
+    def test_output_length_matches_target_when_trimmed(self):
+        """The trimmed window must always be exactly target_samples long."""
+        from detector import select_template_window  # noqa: PLC0415
+        rng = np.random.default_rng(0)
+        template = rng.uniform(-1, 1, 160000).astype(np.float32)
+        windowed, start, end = select_template_window(template, 8000)
+        self.assertEqual(len(windowed), 8000)
+        self.assertEqual(end - start, 8000)
+
+    def test_edges_faded_when_trimmed(self):
+        """Trimmed windows must fade in/out at the edges to avoid hard-cut artifacts."""
+        from detector import select_template_window  # noqa: PLC0415
+        template = np.ones(160000, dtype=np.float32)
+        windowed, _, _ = select_template_window(template, 8000)
+        self.assertAlmostEqual(windowed[0], 0.0, places=5)
+        self.assertLess(windowed[1], windowed[40])
 
 
 class TestParseArgsNewFlags(unittest.TestCase):

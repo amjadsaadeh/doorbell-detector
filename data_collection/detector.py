@@ -81,6 +81,47 @@ def load_template(path: str) -> np.ndarray:
     return audio
 
 
+def select_template_window(template: np.ndarray, target_samples: int) -> tuple:
+    """Select the most energetic contiguous window of length target_samples.
+
+    compute_score() can only ever overlap min(len(audio_chunk), len(template))
+    samples, so a template longer than a chunk is normalized against energy
+    it can never fully correlate against and its score is capped far below
+    the detection threshold. Trimming to the loudest sub-window (the chime's
+    strike/attack) keeps the template chunk-sized so scores reach their full
+    range.
+
+    Args:
+        template: Reference doorbell waveform as a float32 array at RATE Hz.
+        target_samples: Desired window length in samples (normally the audio
+            chunk size).
+
+    Returns:
+        A (windowed_template, start_sample, end_sample) tuple. If template is
+        already <= target_samples, it is returned unchanged with start=0,
+        end=len(template). Otherwise the returned window is target_samples
+        long with a short fade-in/out to avoid hard-cut correlation
+        artifacts at the edges.
+    """
+    if len(template) <= target_samples:
+        return template, 0, len(template)
+
+    squared = template.astype(np.float64) ** 2
+    cumsum = np.concatenate(([0.0], np.cumsum(squared)))
+    window_energy = cumsum[target_samples:] - cumsum[:-target_samples]
+    start = int(np.argmax(window_energy))
+    end = start + target_samples
+    windowed = template[start:end].astype(np.float32).copy()
+
+    fade_len = min(int(0.005 * RATE), target_samples // 10)
+    if fade_len > 1:
+        fade = np.linspace(0.0, 1.0, fade_len, dtype=np.float32)
+        windowed[:fade_len] *= fade
+        windowed[-fade_len:] *= fade[::-1]
+
+    return windowed, start, end
+
+
 def find_device(p: pyaudio.PyAudio, device_name: str):
     """Search PyAudio devices for one whose name contains *device_name*.
 
@@ -358,9 +399,13 @@ def main() -> None:
     """Entry point: parse args, load template, open audio device, capture loop."""
     args = parse_args()
 
-    # -- Template loading --------------------------------------------------
+    # -- Derived constants -------------------------------------------------
+    chunk_size_s = args.chunk_size_ms / 1000.0
+    chunk = int(RATE * chunk_size_s)
+
+    # -- Template loading ----------------------------------------------------
     try:
-        template = load_template(args.template)
+        raw_template = load_template(args.template)
     except FileNotFoundError:
         log.error("Template file not found: %s", args.template)
         sys.exit(1)
@@ -368,11 +413,19 @@ def main() -> None:
         log.error("Failed to load template '%s': %s", args.template, exc)
         sys.exit(1)
 
-    log.info("Loaded template from %s (%d samples, %.2f s)", args.template, len(template), len(template) / RATE)
-
-    # -- Derived constants -------------------------------------------------
-    chunk_size_s = args.chunk_size_ms / 1000.0
-    chunk = int(RATE * chunk_size_s)
+    template, t_start, t_end = select_template_window(raw_template, chunk)
+    if len(raw_template) > chunk:
+        log.info(
+            "Loaded template from %s (%.2f s total) - trimmed to most energetic "
+            "%.2f s window: %.2fs-%.2fs",
+            args.template, len(raw_template) / RATE,
+            (t_end - t_start) / RATE, t_start / RATE, t_end / RATE,
+        )
+    else:
+        log.info(
+            "Loaded template from %s (%d samples, %.2f s)",
+            args.template, len(template), len(template) / RATE,
+        )
 
     # -- Save mode setup ---------------------------------------------------
     save_dir = Path(args.save_dir) if args.save else None

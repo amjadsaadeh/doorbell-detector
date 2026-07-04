@@ -35,8 +35,8 @@ ExecStart=/home/pi/doorbell-detector/data_collection/.venv/bin/python \
     --mqtt-port      ${MQTT_PORT} \
     --mqtt-detect-topic ${MQTT_DETECT_TOPIC} \
     --mqtt-username  ${MQTT_USERNAME} \
-    --mqtt-password  ${MQTT_PASSWORD}
-    --threhold	${TEMPLATE_SCORE_THRESHOLD}
+    --mqtt-password  ${MQTT_PASSWORD} \
+    --threshold      ${TEMPLATE_SCORE_THRESHOLD}
 
 # ---- Resilience ----
 Restart=always

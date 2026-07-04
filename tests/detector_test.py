@@ -49,6 +49,50 @@ class TestComputeScore(unittest.TestCase):
         result = compute_score(audio, self.template)
         self.assertIsInstance(result, float)
 
+    def test_score_is_bounded_by_one(self):
+        """Loud unrelated noise against a quiet template must never exceed 1.0.
+
+        Regression test for the false-positive bug: the score was normalized
+        only by template energy, so it scaled with chunk loudness and loud
+        non-doorbell audio produced scores far above any usable threshold.
+        """
+        from detector import compute_score  # noqa: PLC0415
+        rng = np.random.default_rng(42)
+        quiet_template = (rng.uniform(-1, 1, 8000) * 0.02).astype(np.float32)
+        loud_noise = (rng.uniform(-1, 1, 8000) * 30000).astype(np.int16).tobytes()
+        score = compute_score(loud_noise, quiet_template)
+        self.assertLessEqual(score, 1.0)
+
+    def test_score_is_amplitude_invariant(self):
+        """The same waveform at 20x the template amplitude must score ~1.0, not ~20."""
+        from detector import compute_score  # noqa: PLC0415
+        rng = np.random.default_rng(7)
+        template = (rng.uniform(-1, 1, 8000) * 0.02).astype(np.float32)
+        audio = (template * 20 * 32768).astype(np.int16).tobytes()
+        score = compute_score(audio, template)
+        self.assertGreater(score, 0.9)
+        self.assertLessEqual(score, 1.01)
+
+    def test_template_found_inside_longer_window(self):
+        """A template embedded mid-way in a longer analysis window must score ~1.0."""
+        from detector import compute_score  # noqa: PLC0415
+        rng = np.random.default_rng(3)
+        template = (rng.uniform(-1, 1, 8000) * 0.5).astype(np.float32)
+        window = np.zeros(32000, dtype=np.float32)  # 2 s analysis window
+        window[12000:20000] = template
+        audio = (window * 32767).astype(np.int16).tobytes()
+        score = compute_score(audio, template)
+        self.assertGreater(score, 0.9)
+
+    def test_unrelated_noise_scores_low(self):
+        """Unrelated noise must score well below the ~0.5 match region."""
+        from detector import compute_score  # noqa: PLC0415
+        rng = np.random.default_rng(11)
+        template = (rng.uniform(-1, 1, 8000) * 0.5).astype(np.float32)
+        noise = (rng.uniform(-1, 1, 32000) * 30000).astype(np.int16).tobytes()
+        score = compute_score(noise, template)
+        self.assertLess(score, 0.3)
+
 
 class TestSelectTemplateWindow(unittest.TestCase):
     """Tests for select_template_window(template, target_samples)."""
@@ -132,6 +176,16 @@ class TestParseArgsNewFlags(unittest.TestCase):
         """--cooldown-seconds value passed on CLI must be reflected in args."""
         args = self._parse(["--cooldown-seconds", "5.0"])
         self.assertAlmostEqual(args.cooldown_seconds, 5.0)
+
+    def test_analysis_window_seconds_default(self):
+        """--analysis-window-seconds must default to 2.0."""
+        args = self._parse()
+        self.assertAlmostEqual(args.analysis_window_seconds, 2.0)
+
+    def test_analysis_window_seconds_override(self):
+        """--analysis-window-seconds value passed on CLI must be reflected in args."""
+        args = self._parse(["--analysis-window-seconds", "1.0"])
+        self.assertAlmostEqual(args.analysis_window_seconds, 1.0)
 
 
 class TestSaveClip(unittest.TestCase):

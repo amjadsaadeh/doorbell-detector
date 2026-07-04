@@ -2,9 +2,11 @@
 
 Opens the configured audio input device, loads a reference doorbell WAV
 template (resampling to 16 kHz if needed), and enters a continuous capture
-loop.  On each chunk, peak absolute normalized cross-correlation is computed
-against the template; when the score exceeds --threshold and the cooldown has
-elapsed, a detection event fires.  Detections are published to an MQTT broker
+loop.  Incoming chunks feed a sliding analysis window (--analysis-window-seconds)
+so a ring straddling a chunk boundary is still fully contained in one window;
+peak absolute normalized cross-correlation (bounded [0, 1], loudness-invariant)
+is computed between the window and the template on each chunk.  When the score
+exceeds --threshold and the cooldown has elapsed, a detection event fires.  Detections are published to an MQTT broker
 (optional) and, when --save is active, a timestamped WAV clip is written to
 disk in a background daemon thread.  A ring buffer of pre-trigger audio is
 combined with post-trigger chunks to produce complete doorbell clips suitable
@@ -141,26 +143,38 @@ def find_device(p: pyaudio.PyAudio, device_name: str):
 
 
 def compute_score(audio_bytes: bytes, template: np.ndarray) -> float:
-    """Return the peak absolute normalized cross-correlation between the audio chunk and the template.
+    """Return the peak absolute normalized cross-correlation between the audio and the template.
 
-    The raw cross-correlation is normalized by the template energy so that a
-    perfect amplitude match returns a score of 1.0 regardless of the template
-    amplitude.  Silence (all-zero audio) always returns 0.0.
+    Each correlation lag is normalized by sqrt(template energy * audio window
+    energy) — true normalized cross-correlation — so the score is bounded to
+    [0, 1] and measures waveform similarity independent of loudness.  A loud
+    unrelated sound scores low; the template waveform at any amplitude scores
+    ~1.0.  Silence (all-zero audio) always returns 0.0.
+
+    Only full-overlap alignments are considered, so the audio must be at least
+    as long as the template (callers pass a multi-chunk analysis window).
 
     Args:
         audio_bytes: Raw PCM bytes from PyAudio (16-bit signed integers, mono).
         template: Reference doorbell waveform as a float32 array at RATE Hz.
 
     Returns:
-        A non-negative float.  A value > 0.5 indicates a strong match.
-        Returns exactly 0.0 if the audio is silent or the template has zero energy.
+        A float in [0, 1].  A value > 0.5 indicates a strong match.
+        Returns exactly 0.0 if the audio is silent, shorter than the template,
+        or the template has zero energy.
     """
     audio = np.frombuffer(audio_bytes, dtype=np.int16).astype(np.float32) / 32768.0
-    corr = correlate(audio, template, mode='full', method='fft')
     template_energy = float(np.dot(template, template))
-    if template_energy == 0.0:
+    if template_energy == 0.0 or len(audio) < len(template):
         return 0.0
-    return float(np.max(np.abs(corr)) / template_energy)
+    corr = correlate(audio, template, mode='valid', method='fft')
+    squared = np.concatenate(([0.0], np.cumsum(audio.astype(np.float64) ** 2)))
+    window_energy = squared[len(template):] - squared[:-len(template)]
+    denom = np.sqrt(window_energy * template_energy)
+    valid = denom > 1e-12
+    if not np.any(valid):
+        return 0.0
+    return float(np.max(np.abs(corr[valid]) / denom[valid]))
 
 
 def save_clip(frames: list, filepath: str) -> None:
@@ -212,6 +226,14 @@ def parse_args() -> argparse.Namespace:
         type=float,
         default=0.7,
         help="Cross-correlation score threshold for a detection to fire (default: 0.7).",
+    )
+    parser.add_argument(
+        "--analysis-window-seconds",
+        type=float,
+        default=2.0,
+        help="Length of the sliding analysis window scored against the template. "
+        "Must exceed the chunk size so a doorbell ring straddling a chunk "
+        "boundary is still fully contained in one window (default: 2.0).",
     )
     parser.add_argument(
         "--cooldown-seconds",
@@ -476,6 +498,12 @@ def main() -> None:
 
     # -- Detection state ---------------------------------------------------
     last_detection_time: float = 0.0
+    analysis_chunks = max(1, round(args.analysis_window_seconds / chunk_size_s))
+    analysis_buf: collections.deque = collections.deque(maxlen=analysis_chunks)
+    log.info(
+        "Analysis window %.1f s (%d chunks)",
+        analysis_chunks * chunk_size_s, analysis_chunks,
+    )
 
     # -- Capture loop ------------------------------------------------------
     try:
@@ -484,6 +512,7 @@ def main() -> None:
                 data = stream.read(chunk, exception_on_overflow=False)
                 if ring_buf is not None:
                     ring_buf.append(data)
+                analysis_buf.append(data)
 
                 if trigger_event.is_set():
                     trigger_event.clear()
@@ -513,7 +542,7 @@ def main() -> None:
                         log.warning("MQTT trigger received but --save is not active; ignoring")
                     continue
 
-                score = compute_score(data, template)
+                score = compute_score(b"".join(analysis_buf), template)
                 now = time.monotonic()
                 if score >= args.threshold and (now - last_detection_time) >= args.cooldown_seconds:
                     last_detection_time = now

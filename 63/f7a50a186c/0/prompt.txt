@@ -1,0 +1,6 @@
+<task-notification>
+<task-id>bkce3fymb</task-id>
+<summary>Monitor event: "doorbell-detector detections/errors on Pi (post-fix watch)"</summary>
+<event>Jul 04 17:16:43 mic doorbell-detector[17161]: 2026-07-04 17:16:43 [INFO] Doorbell detected! score=0.4042</event>
+If this event is something the user would act on now, send a PushNotification. Routine or benign output doesn't need one.
+</task-notification>

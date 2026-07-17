@@ -1,0 +1,7 @@
+<task-notification>
+<task-id>bkce3fymb</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/tmp/claude-1000/-home-orchid-projects-doorbell-detector/2aff8e59-2e86-4bae-bac0-680168cef944/tasks/bkce3fymb.output</output-file>
+<status>completed</status>
+<summary>Monitor "doorbell-detector detections/errors on Pi (post-fix watch)" stream ended</summary>
+</task-notification>

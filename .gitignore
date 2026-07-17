@@ -1,5 +1,9 @@
 .python-version
 *.pyc
 .envrc
+.env
 dvc_remote
 tests/data/tmp_mfcc_data/
+
+# local credentials (Label Studio + S3), never committed
+.env.local

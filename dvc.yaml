@@ -19,7 +19,8 @@ stages:
     - data/annotation_per_row_data.csv
     - src/download_audio.py
     outs:
-    - data/audio
+    - data/audio:
+        persist: true
   extract_data_quality:
     cmd: python ./src/extract_data_quality.py
     deps:

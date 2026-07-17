@@ -1,0 +1,5 @@
+ok I set the missing information in an .env file. If you run any python related command use uv. Before you start any test: the bucket is called doorbell-detector, but there is von env var to set it at the moment. Raw data are located in the folder `raw` and annotation are synced by labelstudio to the dir `annotations` in the same bucket. May this knowlege change any design decision you made
+
+---
+
+continue

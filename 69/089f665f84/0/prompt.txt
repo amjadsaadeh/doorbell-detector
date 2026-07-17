@@ -1,0 +1,1 @@
+if the pi reboot within the 7am-9pm interval, does the doorbell-detector startup, since it's not started on boot any more?

@@ -1,0 +1,1 @@
+extens the Data collextion Script by a simple method to detect my doorbell, e.g. using pattern matching

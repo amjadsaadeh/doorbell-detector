@@ -1,0 +1,3 @@
+SSH to the Pi and check the doorbell-detector service (run 1/4 — 00:07 CEST):
+ssh pi@mic "systemctl is-active doorbell-detector.service; systemctl status doorbell-detector.service --no-pager | tail -3"
+Send a PushNotification: "doorbell-detector @ 00:07 CEST (1/4): ACTIVE" or "INACTIVE — &lt;last journal line&gt;"

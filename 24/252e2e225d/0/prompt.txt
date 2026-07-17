@@ -1,0 +1,1 @@
+OK, adapt the detector to make a proper trim selection of the part for the template in start. the logs should Show which second this part Starts and which IT ends

@@ -52,7 +52,7 @@ Scripts are assumed to run from the project root (relative path `"params.yaml"`)
 
 **Runtime (collector) configuration** is entirely via CLI flags, with defaults baked into `argparse`. The systemd unit sources `/etc/doorbell-collector.env` as an `EnvironmentFile` and expands variables into the `ExecStart` command. No `params.yaml` is used in the collection sub-project.
 
-**Secrets / API credentials** are read from environment variables via `os.getenv()` — e.g., `LABEL_STUDIO_URL`, `API_KEY`. These are not committed (`.env` is gitignored).
+**Secrets / API credentials** are read from environment variables via `os.getenv()` — e.g., `LABEL_STUDIO_URL`, `LABEL_STUDIO_API_KEY`. These are not committed (`.env` is gitignored).
 
 ## Error Handling Patterns
 

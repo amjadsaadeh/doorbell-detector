@@ -35,7 +35,7 @@
 
 **Label Studio:**
 - API token passed as HTTP header: `Authorization: Token ${API_KEY}`
-- Token sourced from `API_KEY` environment variable
+- Token sourced from `LABEL_STUDIO_API_KEY` environment variable
 
 **MQTT broker (optional, all disabled by default):**
 
@@ -97,7 +97,7 @@
 | Variable | Used by | Purpose |
 |----------|---------|---------|
 | `LABEL_STUDIO_URL` | `src/fetch_data.sh`, `src/download_audio.py`, `make_background.py` | Label Studio base URL |
-| `API_KEY` | `src/fetch_data.sh`, `src/download_audio.py`, `make_background.py` | Label Studio API token |
+| `LABEL_STUDIO_API_KEY` | `src/fetch_data.sh`, `src/download_audio.py`, `make_background.py` | Label Studio API token |
 | `MIC_SSH_URI` | `src/deploy.sh` | SSH target for deploying to Raspberry Pi |
 | `SAVE_DIR` | systemd env file → `data_collector.py` | Directory for triggered recordings |
 | `BUFFER_MINUTES` | systemd env file → `data_collector.py` | Ring buffer duration |

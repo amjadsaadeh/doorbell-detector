@@ -80,7 +80,7 @@
 - Purpose: Pull labeled data out of Label Studio
 - Location: `src/fetch_data.sh`, `src/download_audio.py`
 - Contains: Shell script for CSV export, Python script for WAV downloads
-- Depends on: Label Studio REST API, env vars `LABEL_STUDIO_URL` and `API_KEY`
+- Depends on: Label Studio REST API, env vars `LABEL_STUDIO_URL` and `LABEL_STUDIO_API_KEY`
 - Used by: DVC stages `fetch_labeled_data` and `download_audio`
 
 **Data Preparation Layer:**
@@ -221,7 +221,7 @@
 
 **Validation:** No input validation in training scripts. `data_collector.py` validates `--model-path` existence and exits if the audio device is not found.
 
-**Authentication:** Label Studio access uses `LABEL_STUDIO_URL` and `API_KEY` env vars (read in `src/fetch_data.sh` and `src/download_audio.py`). MQTT supports optional username/password and TLS client certificates configured via CLI flags passed from the systemd env file.
+**Authentication:** Label Studio access uses `LABEL_STUDIO_URL` and `LABEL_STUDIO_API_KEY` env vars (read in `src/fetch_data.sh` and `src/download_audio.py`). MQTT supports optional username/password and TLS client certificates configured via CLI flags passed from the systemd env file.
 
 ---
 

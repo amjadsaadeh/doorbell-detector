@@ -8,7 +8,7 @@ from label_studio_sdk.data_manager import Filters, Column, Type, Operator
 if __name__ == '__main__':
 
     url = os.getenv('LABEL_STUDIO_URL')
-    api_key = os.getenv('API_KEY')
+    api_key = os.getenv('LABEL_STUDIO_API_KEY')
 
     client = LabelStudio(
         base_url=url,

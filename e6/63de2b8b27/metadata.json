@@ -1,0 +1,30 @@
+{
+  "cli_version": "0.8.42",
+  "checkpoint_id": "e663de2b8b27",
+  "strategy": "manual-commit",
+  "branch": "main",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "src/convert_labeled_data.py",
+    "src/draw_data.py",
+    "src/extract_mfcc_features.py",
+    "src/fetch_data.sh",
+    "tests/convert_labeled_data_test.py"
+  ],
+  "sessions": [
+    {
+      "metadata": "/e6/63de2b8b27/0/metadata.json",
+      "transcript": "/e6/63de2b8b27/0/full.jsonl",
+      "compact_transcript": "/e6/63de2b8b27/0/transcript.jsonl",
+      "content_hash": "/e6/63de2b8b27/0/content_hash.txt",
+      "prompt": "/e6/63de2b8b27/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 17106,
+    "cache_creation_tokens": 418078,
+    "cache_read_tokens": 7935252,
+    "output_tokens": 70274,
+    "api_call_count": 78
+  }
+}

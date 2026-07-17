@@ -1,0 +1,1 @@
+I want to trigger a recording via mqtt. service is running, I got a mqtt broker on my homeassistant instance. How to I trigger a recording?

@@ -1,0 +1,1 @@
+ok use ssh pi@mic to do some inspection. I did send a "trigger" payload to the specified topic via ha, but the doorbell detector doesn't seem to be notified

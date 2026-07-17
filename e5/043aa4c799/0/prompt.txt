@@ -1,0 +1,5 @@
+ok, run the dvc repro and fix the other Stages. the size of the audio snippets to be used for.processing should be 2 seconds
+
+---
+
+do a full dvc repro and push

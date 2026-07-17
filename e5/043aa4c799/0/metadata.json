@@ -1,0 +1,83 @@
+{
+  "cli_version": "0.8.42",
+  "checkpoint_id": "e5043aa4c799",
+  "session_id": "9298e537-72f8-4fb8-b9a0-a2ce4d76c687",
+  "strategy": "manual-commit",
+  "created_at": "2026-07-17T19:28:59.994715026Z",
+  "branch": "main",
+  "checkpoints_count": 2,
+  "save_step_count": 2,
+  "files_touched": [
+    "data/data_quality/chunk_balanced_quality.json",
+    "data/data_quality/chunks_per_label.csv",
+    "dvc.lock",
+    "dvclive/metrics.json",
+    "dvclive/plots/metrics/f1_score.tsv",
+    "dvclive/plots/metrics/precision.tsv",
+    "dvclive/plots/metrics/recall.tsv",
+    "dvclive/plots/metrics/validation_0/logloss.tsv",
+    "dvclive/plots/sklearn/confusion_matrix.json",
+    "params.yaml"
+  ],
+  "agent": "Claude Code",
+  "model": "",
+  "turn_id": "72e0894249ce",
+  "compact_transcript_start": 0,
+  "token_usage": {
+    "input_tokens": 54,
+    "cache_creation_tokens": 83583,
+    "cache_read_tokens": 1824606,
+    "output_tokens": 17899,
+    "api_call_count": 28
+  },
+  "session_metrics": {
+    "turn_count": 2
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-07-17T19:28:59.967914391Z",
+    "agent_lines": 47,
+    "agent_removed": 1332,
+    "human_added": 0,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 47,
+    "total_lines_changed": 1379,
+    "agent_percentage": 100,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 18,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        ".claude/scheduled_tasks.lock": 1,
+        ".claude/settings.local.json": 17
+      }
+    },
+    {
+      "checkpoint_number": 2,
+      "user_lines_added": 20,
+      "user_lines_removed": 0,
+      "agent_lines_added": 47,
+      "agent_lines_removed": 1332,
+      "user_added_per_file": {
+        ".claude/scheduled_tasks.lock": 1,
+        ".claude/settings.local.json": 19
+      }
+    },
+    {
+      "checkpoint_number": 3,
+      "user_lines_added": 20,
+      "user_lines_removed": 0,
+      "agent_lines_added": 47,
+      "agent_lines_removed": 1332,
+      "user_added_per_file": {
+        ".claude/scheduled_tasks.lock": 1,
+        ".claude/settings.local.json": 19
+      }
+    }
+  ]
+}

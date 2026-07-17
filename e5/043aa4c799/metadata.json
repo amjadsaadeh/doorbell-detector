@@ -1,0 +1,35 @@
+{
+  "cli_version": "0.8.42",
+  "checkpoint_id": "e5043aa4c799",
+  "strategy": "manual-commit",
+  "branch": "main",
+  "checkpoints_count": 2,
+  "files_touched": [
+    "data/data_quality/chunk_balanced_quality.json",
+    "data/data_quality/chunks_per_label.csv",
+    "dvc.lock",
+    "dvclive/metrics.json",
+    "dvclive/plots/metrics/f1_score.tsv",
+    "dvclive/plots/metrics/precision.tsv",
+    "dvclive/plots/metrics/recall.tsv",
+    "dvclive/plots/metrics/validation_0/logloss.tsv",
+    "dvclive/plots/sklearn/confusion_matrix.json",
+    "params.yaml"
+  ],
+  "sessions": [
+    {
+      "metadata": "/e5/043aa4c799/0/metadata.json",
+      "transcript": "/e5/043aa4c799/0/full.jsonl",
+      "compact_transcript": "/e5/043aa4c799/0/transcript.jsonl",
+      "content_hash": "/e5/043aa4c799/0/content_hash.txt",
+      "prompt": "/e5/043aa4c799/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 54,
+    "cache_creation_tokens": 83583,
+    "cache_read_tokens": 1824606,
+    "output_tokens": 17899,
+    "api_call_count": 28
+  }
+}

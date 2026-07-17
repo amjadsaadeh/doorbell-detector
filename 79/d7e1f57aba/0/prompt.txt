@@ -1,0 +1,33 @@
+<task-notification>
+<task-id>a9122b35ea6f1edfb</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/tmp/claude-1000/-home-orchid-projects-doorbell-detector/acda7fba-2d99-4812-a2bd-c1e6466c8087/tasks/a9122b35ea6f1edfb.output</output-file>
+<status>completed</status>
+<summary>Agent "Concerns mapper — CONCERNS.md" completed</summary>
+<result>CONCERNS.md written.
+
+**Document written:**
+- `/home/orchid/projects/doorbell-detector/.planning/codebase/CONCERNS.md` (174 lines)
+
+**Summary of what was found:**
+
+**High severity (3):**
+- Broken unit tests — `feature_extraction_test.py` calls `extract_mfcc_features` with 5 arguments but the function only accepts 3; the test suite is non-functional
+- DVC remote is a local relative path (`../dvc_remote`) that breaks on any fresh clone
+- MQTT password exposed as a CLI argument, visible in `/proc/&lt;pid&gt;/cmdline` to all system users
+
+**Medium severity (5):**
+- `src/deploy.sh` references the old pre-refactor path `src/data_collector.py` (file moved in commit `9c32927`); deploying to the Pi is currently broken
+- `ssl.PROTOCOL_TLS` used in the TLS setup is deprecated/removed in Python 3.12+
+- No `response.raise_for_status()` in the audio downloader — HTTP errors silently corrupt `.wav` files in the dataset
+- Feature extraction parameters (`n_mfcc`, `n_fft`) are duplicated between `params.yaml` and the inference CLI with no validation link — a silent mismatch would produce garbage predictions
+- `is_saving` bool is not thread-safe against the paho-mqtt background thread
+
+**Low severity (5):**
+- No pytest configuration file; test imports rely on implicit `sys.path`
+- `requirements.txt` is a fully-pinned dev+runtime dump including unused `celery`; unusable on Pi without trimming
+- `RPi.GPIO` commented out in `data_collection/requirements.txt`, silently disabling GPIO
+- Audio device name `seeed-2mic-voicecard` is hardcoded with no CLI override
+- No outgoing notification after doorbell detection — the core user-facing feature is not implemented</result>
+<usage><total_tokens>45175</total_tokens><tool_uses>47</tool_uses><duration_ms>184397</duration_ms></usage>
+</task-notification>

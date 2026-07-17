@@ -1,0 +1,5 @@
+<task-notification>
+<task-id>brayrgue5</task-id>
+<summary>Monitor event: "detections/overflows/errors in doorbell-detector journal on Pi"</summary>
+<event>[Monitor timed out — re-arm if needed.]</event>
+</task-notification>

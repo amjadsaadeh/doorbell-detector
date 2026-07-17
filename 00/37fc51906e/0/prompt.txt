@@ -1,0 +1,1 @@
+i got the Data and the labels in Labelstudio. how do i incorporate IT with my dvc Workflow? i want to receive the Data directly from Labelstudio (at least the labels, raw Sound dta can be fetched from s3 bucket).

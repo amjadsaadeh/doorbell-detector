@@ -3,3 +3,7 @@ ok I set the missing information in an .env file. If you run any python related 
 ---
 
 continue
+
+---
+
+commit and push

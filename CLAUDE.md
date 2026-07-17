@@ -56,3 +56,7 @@ matching, GPIO button trigger, Prometheus metrics/health endpoint.
 | `.planning/REQUIREMENTS.md` | 15 v1 requirements with REQ-IDs |
 | `.planning/ROADMAP.md` | 3-phase roadmap (all complete) |
 | `.planning/STATE.md` | Milestone status and deferred v2 items |
+
+## Commands
+
+This project uses uv for dependency and venv management, os use `uv` to run python commands.

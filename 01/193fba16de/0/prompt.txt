@@ -1,0 +1,1 @@
+well, the recording should he triggered only on the paxload "record"

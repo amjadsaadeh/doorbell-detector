@@ -1,0 +1,7 @@
+<task-notification>
+<task-id>b5eks53rh</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/tmp/claude-1000/-home-orchid-projects-doorbell-detector/2aff8e59-2e86-4bae-bac0-680168cef944/tasks/b5eks53rh.output</output-file>
+<status>completed</status>
+<summary>Background command "Wait for Pi to come back online, then verify detector service" completed (exit code 0)</summary>
+</task-notification>

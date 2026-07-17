@@ -1,0 +1,1 @@
+checkout the detection.py. i got a template with about 10s. can it even match?

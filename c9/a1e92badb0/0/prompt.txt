@@ -1,0 +1,1 @@
+Connect via ssh pi@mic there is a systemd unit named doorbell-detector.service. this Service should only Run between 7am and 9pm, otherwise IT IS shut down.

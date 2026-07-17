@@ -1,0 +1,1 @@
+Check the logs for the doorbell-detection Service at pi@mic. whats the Intervall of the template trimed to?

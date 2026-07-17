@@ -21,6 +21,9 @@ def extract_mfcc_features(
     # Extract MFCC features
     audio = AudioSegment.from_wav(file_path)
     info = mediainfo(file_path)
+    # downmix to mono; stereo files would double the samples (interleaved)
+    # and break the frames-per-second assumption in draw_data.py
+    audio = audio.set_channels(1)
     audio_segment = np.array(audio.get_array_of_samples(), dtype=np.float32)
     mfccs = librosa.feature.mfcc(
         y=audio_segment, sr=int(info["sample_rate"]), n_mfcc=n_mfcc, n_fft=n_fft

@@ -23,6 +23,26 @@ class TestConvertLabeledData(unittest.TestCase):
             self.assertIn(series_name, gt_df.columns, f'Column {series_name} not found in reference DataFrame')
             pd.testing.assert_series_equal(series, gt_df[series_name], f'Column {series_name} is not equal')
 
+    def test_annotation_without_labeled_intervals_becomes_background(self):
+        # tag-only annotations (e.g. "silence") have an empty label column,
+        # which pandas reads as NaN; they cover the whole file as background
+        df = pd.DataFrame({
+            'annotation_id': [88],
+            'annotator': [1],
+            'audio': ['s3://doorbell-detector/raw/doorbell_20260702_111445.wav'],
+            'id': [1728],
+            'label': [float('nan')],
+        })
+        converted_df = annotation_to_sample_per_row(df)
+
+        self.assertEqual(len(converted_df.index), 1)
+        row = converted_df.iloc[0]
+        self.assertEqual(row['label'], 'background')
+        self.assertEqual(row['start'], 0.0)
+        self.assertTrue(pd.isna(row['end']))
+        self.assertEqual(row['audio_file_name'], 'doorbell_20260702_111445.wav')
+        self.assertEqual(row['remote_audio_path'], 's3://doorbell-detector/raw/doorbell_20260702_111445.wav')
+
 
 class TestNormalizeAudioUri(unittest.TestCase):
 

@@ -57,6 +57,10 @@ if __name__ == "__main__":
     # Preload duration, so we don't have to read the file for each chunk
     annotated_data["audio_file_duration"] = annotated_data["audio_file_name"].parallel_apply(lambda x: mediainfo(AUDIO_FILE_BASE / x)["duration"])
 
+    # Full-file background annotations (tag-only in Label Studio) carry no end
+    # time; use the real file duration
+    annotated_data["end"] = annotated_data["end"].fillna(annotated_data["audio_file_duration"].astype(float))
+
     # Cut in chunks
     chunk_size = params["chunk_size"]
     chunk_overlap = params["chunk_overlap"]

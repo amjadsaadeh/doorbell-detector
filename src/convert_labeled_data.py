@@ -105,8 +105,23 @@ def annotation_to_sample_per_row(df: pd.DataFrame) -> pd.DataFrame:
 
     for row in df.iterrows():
         row = row[1]
-        annotation_data = json.loads(row.label)
         audio_uri = normalize_audio_uri(row.audio)
+
+        # Annotations without labeled intervals (tag-only annotations, e.g.
+        # "silence" or "doorslam") have an empty label column in the export.
+        # The whole file is background then; end stays NaN and is filled with
+        # the real file duration in draw_data.py, after the audio is downloaded.
+        if not isinstance(row.label, str) or not row.label.strip():
+            result["label"].append("background")
+            result["start"].append(0.0)
+            result["end"].append(float("nan"))
+            result["file_id"].append(row.id)
+            result["remote_audio_path"].append(audio_uri)
+            result["audio_file_name"].append(derive_audio_file_name(audio_uri))
+            result["annotation_id"].append(row.annotation_id)
+            continue
+
+        annotation_data = json.loads(row.label)
 
         for annotation in annotation_data:
             for label in annotation["labels"]:

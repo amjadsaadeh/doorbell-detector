@@ -1,5 +1,4 @@
 label,0
-background,3619
-flatdoor_bell,915
-gardendoor_bell,560
-housedoor_bell,2144
+background,862
+flat_doorbell,42
+front_doorbell,820

@@ -5,7 +5,39 @@
 Audio-based doorbell detection system running on a Raspberry Pi. The project has two
 main modes: an ML-based collector (`data_collection/data_collector.py`) and a
 pattern-matching detector (`data_collection/detector.py`), deployed as a systemd
-service.
+service. Alongside the Pi scripts lives a DVC-managed ML pipeline (`src/`, `dvc.yaml`)
+that pulls labels from Label Studio and raw audio from a self-hosted MinIO S3 bucket
+to train an XGBoost bell classifier.
+
+## ML Data Pipeline (DVC)
+
+`uv run dvc repro` runs the full chain:
+`fetch_labeled_data` (Label Studio CSV export) → `convert_labeled_data` →
+`download_audio` (S3) → `extract_data_quality` / `extract_features` (MFCC) →
+`draw_data` (chunking + balancing) → `train_model` (XGBoost + dvclive).
+
+- **Storage layout:** bucket `doorbell-detector` on MinIO — `raw/` (audio, Label Studio
+  source storage), `annotations/` (Label Studio target-storage sync, backup only),
+  `dvc/` (DVC remote, configured in `.dvc/config`).
+- **Credentials** live in the git-ignored `.env`: `LABEL_STUDIO_URL`,
+  `LABEL_STUDIO_API_KEY`, `AWS_ENDPOINT_URL`, `AWS_ACCESS_KEY_ID`,
+  `AWS_SECRET_ACCESS_KEY`. Source it before `dvc repro`/`dvc push`.
+- **Label Studio auth** is a JWT personal access token: `fetch_data.sh` exchanges it
+  via `/api/token/refresh` for a Bearer token (legacy `Token` header returns 401).
+- **Incrementality:** `data/audio` is a `persist: true` output — unchanged labels skip
+  the download stage entirely; changed labels download only missing files and prune
+  removed ones. Labels are only re-fetched explicitly:
+  `uv run dvc repro -f fetch_labeled_data && uv run dvc repro`.
+- **Labeling convention:** bell events get span labels (e.g. `front_doorbell`);
+  tag-only annotations (doorslam, voice, silence, …) have an empty `label` column in
+  the export and become full-file `background` rows in the converter. The end time is
+  filled with the real file duration in `draw_data.py`.
+- `convert_labeled_data.py` normalizes any Label Studio audio reference (plain
+  `s3://`, presigned URL, resolver path) to canonical `s3://bucket/key` so presigned
+  URL churn never dirties the pipeline.
+- `extract_mfcc_features.py` downmixes to mono — stereo uploads would silently double
+  the MFCC frame rate and break chunking.
+- Requires `ffmpeg`/`ffprobe` on the host (pydub `mediainfo`).
 
 ## GSD Workflow
 
@@ -42,6 +74,11 @@ matching, GPIO button trigger, Prometheus metrics/health endpoint.
 - `src/deploy.sh` references the old path `src/data_collector.py` (file moved) — broken, out of scope for this work
 - Oversized templates are auto-trimmed to their most energetic window (see `0b3163a`)
 - Cross-correlation is slow enough to drop audio in saved clips if not handled carefully (see `c8c2788`)
+- Root `requirements.txt` was removed — `pyproject.toml`/`uv.lock` is the single source
+  of pipeline dependencies (`data_collection/requirements.txt` remains for the Pi)
+- Pre-existing test failures in `detector_test.py` and `feature_extraction_test.py`
+  (test-signature drift) — unrelated to the pipeline; run tests with
+  `PYTHONPATH=./src:. uv run pytest tests/`
 
 ## Key Files
 
@@ -52,11 +89,28 @@ matching, GPIO button trigger, Prometheus metrics/health endpoint.
 | `data_collection/systemd/doorbell-detector.service` | systemd unit for running detector.py on the Pi |
 | `data_collection/systemd/doorbell-detector.env` | Env file consumed by the systemd unit (MQTT creds, buffer/threshold config) |
 | `data_collection/requirements.txt` | Pi runtime dependencies |
+| `dvc.yaml` / `dvc.lock` | ML pipeline stage definitions and lock state |
+| `src/fetch_data.sh` | Label Studio CSV export (JWT token exchange) |
+| `src/convert_labeled_data.py` | Export → annotation-per-row CSV; URI normalization; tag-only → background |
+| `src/download_audio.py` | Incremental S3 audio download (boto3) with pruning |
+| `src/extract_mfcc_features.py` | MFCC extraction (mono-downmixed) |
+| `src/draw_data.py` | Chunking, background balancing → `balanced_data.h5` |
+| `src/train_xgboost.py` | XGBoost training with dvclive metrics |
 | `params.yaml` | ML pipeline parameters (not used by detector) |
+| `.env` | Git-ignored credentials for Label Studio + MinIO |
 | `.planning/REQUIREMENTS.md` | 15 v1 requirements with REQ-IDs |
 | `.planning/ROADMAP.md` | 3-phase roadmap (all complete) |
 | `.planning/STATE.md` | Milestone status and deferred v2 items |
 
 ## Commands
 
-This project uses uv for dependency and venv management, os use `uv` to run python commands.
+This project uses uv for dependency and venv management, so use `uv` to run python
+commands.
+
+```
+set -a; source .env; set +a       # load credentials first
+uv run dvc repro                  # run/refresh the pipeline (labels NOT re-fetched)
+uv run dvc repro -f fetch_labeled_data && uv run dvc repro   # refresh labels too
+uv run dvc push                   # push data/model versions to MinIO
+PYTHONPATH=./src:. uv run pytest tests/
+```

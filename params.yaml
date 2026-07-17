@@ -1,5 +1,5 @@
-chunk_size: 500 # ms
-chunk_overlap: 30 #ms
+chunk_size: 2000 # ms
+chunk_overlap: 250 #ms
 inbalance_ratio: 1.0 # How much more background samples should be drawn
 
 feature_extraction:

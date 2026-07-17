@@ -131,8 +131,8 @@ stages:
     deps:
     - path: data/balanced_data.h5
       hash: md5
-      md5: 75f148b022fb2d513dc891fbfbe0c9da
-      size: 2590064
+      md5: ae94d6f2688ca6fa0017ae9194562563
+      size: 1455648
     - path: src/train_xgboost.py
       hash: md5
       md5: a94f24210bcef0f336e549a5ed51ad8e
@@ -149,8 +149,8 @@ stages:
     outs:
     - path: models/xgboost_model.json
       hash: md5
-      md5: 8468fea8ac57c15cee89622efaa88a5e
-      size: 40964
+      md5: 94a1b2c8301cd6836288786fe9e10ce6
+      size: 14054
   draw_data:
     cmd: python src/draw_data.py
     deps:
@@ -169,11 +169,11 @@ stages:
       size: 4293
     params:
       params.yaml:
-        chunk_overlap: 30
-        chunk_size: 500
+        chunk_overlap: 250
+        chunk_size: 2000
         inbalance_ratio: 1.0
     outs:
     - path: data/balanced_data.h5
       hash: md5
-      md5: 75f148b022fb2d513dc891fbfbe0c9da
-      size: 2590064
+      md5: ae94d6f2688ca6fa0017ae9194562563
+      size: 1455648

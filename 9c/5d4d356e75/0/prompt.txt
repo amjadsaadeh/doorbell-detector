@@ -1,0 +1,7 @@
+<task-notification>
+<task-id>b8ec76bak</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/tmp/claude-1000/-home-orchid-projects-doorbell-detector/2aff8e59-2e86-4bae-bac0-680168cef944/tasks/b8ec76bak.output</output-file>
+<status>failed</status>
+<summary>Monitor "doorbell-detector detections/errors on Pi (post-fix watch)" script failed (exit 1)</summary>
+</task-notification>

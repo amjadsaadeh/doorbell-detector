@@ -1,0 +1,18 @@
+<task-notification>
+<task-id>a36f9d63052759597</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/tmp/claude-1000/-home-orchid-projects-doorbell-detector/acda7fba-2d99-4812-a2bd-c1e6466c8087/tasks/a36f9d63052759597.output</output-file>
+<status>completed</status>
+<summary>Agent "Quality mapper — CONVENTIONS.md + TESTING.md" completed</summary>
+<result>CONVENTIONS.md and TESTING.md written.
+
+## Mapping Complete
+
+**Focus:** quality
+**Documents written:**
+- `/home/orchid/projects/doorbell-detector/.planning/codebase/CONVENTIONS.md` (130 lines)
+- `/home/orchid/projects/doorbell-detector/.planning/codebase/TESTING.md` (152 lines)
+
+Ready for orchestrator summary.</result>
+<usage><total_tokens>37319</total_tokens><tool_uses>26</tool_uses><duration_ms>172008</duration_ms></usage>
+</task-notification>

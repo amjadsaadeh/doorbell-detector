@@ -1,0 +1,1 @@
+inspect the detector.py and the deployment via ssh pi@mic. the template match trigger gives a lot false positives. give me 2 to 3 possible root causes and fixes

@@ -2,6 +2,14 @@ chunk_size: 2000 # ms
 chunk_overlap: 250 #ms
 inbalance_ratio: 1.0 # How much more background samples should be drawn
 
+augmentation:
+  # Target signal-to-noise ratios (dB) for synthetic front_doorbell samples,
+  # doorbell = signal, everything else = noise. Spans noise-dominant (-5dB)
+  # to clearly audible (+15dB) to cover realistic in-the-wild conditions.
+  snrs_db: [-5, 0, 5, 10, 15]
+  # How many random noise chunks to pair with each real doorbell chunk, per SNR
+  pairs_per_signal_chunk: 1
+
 feature_extraction:
   n_mfcc: 13
   n_fft: 512

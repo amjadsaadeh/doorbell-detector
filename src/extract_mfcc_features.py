@@ -11,6 +11,7 @@ from multiprocessing import Pool
 
 
 AUDIO_DATA_PATH = Path("./data/audio")
+AUGMENTED_AUDIO_DATA_PATH = Path("./data/augmented_audio")
 
 
 def extract_mfcc_features(
@@ -72,4 +73,9 @@ if __name__ == "__main__":
 
     process_audio_data(
         params, AUDIO_DATA_PATH, Path("./data/mfcc_data")
+    )
+    # Augmented (mixed) chunks land in the same output dir; filenames are
+    # unique across both sources so there's no collision.
+    process_audio_data(
+        params, AUGMENTED_AUDIO_DATA_PATH, Path("./data/mfcc_data")
     )

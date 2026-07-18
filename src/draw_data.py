@@ -15,15 +15,27 @@ from pandarallel import pandarallel
 
 MFCC_FEATURES_FILE_BASE = Path('./data/mfcc_data')
 AUDIO_FILE_BASE = Path('./data/audio')
+AUGMENTED_AUDIO_FILE_BASE = Path('./data/augmented_audio')
 SAMPLING_RATE = 16000
+HOP_LENGTH = 512  # librosa.feature.mfcc default, must match extract_mfcc_features.py
+FRAMES_PER_MS = SAMPLING_RATE / HOP_LENGTH / 1000
 
-def get_mfcc_features(start: int,  end: int, audio_file_name: str, audio_file_duration: int) -> np.ndarray:
+
+def resolve_audio_path(audio_file_name: str) -> Path:
+    """Real annotations point at data/audio; augmented (mixed) samples live
+    under data/augmented_audio instead."""
+    for base in (AUDIO_FILE_BASE, AUGMENTED_AUDIO_FILE_BASE):
+        candidate = base / audio_file_name
+        if candidate.exists():
+            return candidate
+    raise FileNotFoundError(audio_file_name)
+
+def get_mfcc_features(start: int,  end: int, audio_file_name: str) -> np.ndarray:
     """Reads out the MFCC features from the file and cut them according to start and end.
 
     Args:
         start (int): start in ms
         end (int): end in ms
-        duration (int): duration of the orifinal sound file in s (otherwise I didn't find a proper way to deduce the number of mel samples)
         audio_file_name (str): file to read the mfcc features from
 
     Returns:
@@ -32,12 +44,15 @@ def get_mfcc_features(start: int,  end: int, audio_file_name: str, audio_file_du
 
     mfcc_file_path = MFCC_FEATURES_FILE_BASE / audio_file_name.replace('.wav', '.npy')
     mfccs = np.load(mfcc_file_path)
-    
-    # Calculate the start and end sample
-    mel_coeffs_per_second = mfccs.shape[1] / float(audio_file_duration)
 
-    start_sample = int((mel_coeffs_per_second * start) / 1000)
-    chunk_size = int(mel_coeffs_per_second * (end - start) / 1000)
+    # Use the fixed sample_rate/hop_length rate librosa used to build the
+    # array, not a per-file average (mfccs.shape[1] / duration): librosa's
+    # frame count has a constant +1 offset, which is negligible for long
+    # real files (avg rate ~= true rate) but dominant for exactly
+    # chunk_size-long augmented clips (avg rate skews high), so per-file
+    # rates produced inconsistent chunk widths and broke np.vstack downstream.
+    start_sample = int(FRAMES_PER_MS * start)
+    chunk_size = int(FRAMES_PER_MS * (end - start))
     end_sample = start_sample + chunk_size # This way the shape of the slice it more reliably the same every time
 
     res = mfccs[:, start_sample:end_sample]
@@ -53,9 +68,14 @@ if __name__ == "__main__":
         params = yaml.safe_load(file)
 
     annotated_data = pd.read_csv("./data/annotation_per_row_data.csv")
+    # Synthetic front_doorbell samples from the augmentation stage (mixed
+    # signal+noise at target SNRs) are appended as regular rows so they flow
+    # through the same chunking/balancing logic as real annotations.
+    augmented_data = pd.read_csv("./data/augmented_annotations.csv")
+    annotated_data = pd.concat([annotated_data, augmented_data], ignore_index=True)
 
     # Preload duration, so we don't have to read the file for each chunk
-    annotated_data["audio_file_duration"] = annotated_data["audio_file_name"].parallel_apply(lambda x: mediainfo(AUDIO_FILE_BASE / x)["duration"])
+    annotated_data["audio_file_duration"] = annotated_data["audio_file_name"].parallel_apply(lambda x: mediainfo(resolve_audio_path(x))["duration"])
 
     # Full-file background annotations (tag-only in Label Studio) carry no end
     # time; use the real file duration
@@ -99,11 +119,10 @@ if __name__ == "__main__":
     # Add MFCC features column
     balanced_df['mfcc_features'] = balanced_df.parallel_apply(
         lambda row: get_mfcc_features(
-            row['chunk_start'], 
+            row['chunk_start'],
             row['chunk_end'],
             row['audio_file_name'],
-            row['audio_file_duration']
-        ), 
+        ),
         axis=1
     )
 

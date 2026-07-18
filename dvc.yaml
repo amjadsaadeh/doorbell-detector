@@ -29,10 +29,25 @@ stages:
     outs:
     - data/data_quality/sample_based_quality.json
     - data/data_quality/samples_per_label.csv
+  augmentation:
+    cmd: python src/augment_data.py
+    deps:
+    - data/audio
+    - data/annotation_per_row_data.csv
+    - src/augment_data.py
+    params:
+    - chunk_size
+    - chunk_overlap
+    - augmentation
+    outs:
+    - data/augmented_audio
+    - data/augmented_annotations.csv
+
   extract_features:
     cmd: python src/extract_mfcc_features.py
     deps:
     - data/audio
+    - data/augmented_audio
     - src/extract_mfcc_features.py
     params:
     - feature_extraction
@@ -47,6 +62,7 @@ stages:
     - chunk_overlap
     deps:
     - data/annotation_per_row_data.csv
+    - data/augmented_annotations.csv
     - data/mfcc_data/
     - src/draw_data.py
     outs:

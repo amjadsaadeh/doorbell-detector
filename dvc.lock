@@ -111,10 +111,15 @@ stages:
       md5: 76e7b567abe76d809d629e6189db13d2.dir
       size: 14636020
       nfiles: 51
+    - path: data/augmented_audio
+      hash: md5
+      md5: 4b2dcbee9dea2c79e4e8ffdef2b778e7.dir
+      size: 18892980
+      nfiles: 295
     - path: src/extract_mfcc_features.py
       hash: md5
-      md5: c3fec6c25cb2fd97b0e19041f359af79
-      size: 2162
+      md5: 46b9dd2dd0448d0c9434360896a3918b
+      size: 2451
     params:
       params.yaml:
         feature_extraction:
@@ -123,16 +128,16 @@ stages:
     outs:
     - path: data/mfcc_data/
       hash: md5
-      md5: 7762e794faafd8da85957780d407884e.dir
-      size: 743680
-      nfiles: 51
+      md5: f4a86669b38664176cf2bf814c1c748a.dir
+      size: 1747860
+      nfiles: 346
   train_model:
     cmd: python src/train_xgboost.py
     deps:
     - path: data/balanced_data.h5
       hash: md5
-      md5: ae94d6f2688ca6fa0017ae9194562563
-      size: 1455648
+      md5: e402e0363705eb8aba08436b2d670401
+      size: 3437544
     - path: src/train_xgboost.py
       hash: md5
       md5: a94f24210bcef0f336e549a5ed51ad8e
@@ -149,8 +154,8 @@ stages:
     outs:
     - path: models/xgboost_model.json
       hash: md5
-      md5: 94a1b2c8301cd6836288786fe9e10ce6
-      size: 14054
+      md5: a0abb8800f13bf2666b4ec4597503ada
+      size: 28957
   draw_data:
     cmd: python src/draw_data.py
     deps:
@@ -158,15 +163,19 @@ stages:
       hash: md5
       md5: 5b4e4aed8f6bdc5f7f12165ab4703003
       size: 6187
+    - path: data/augmented_annotations.csv
+      hash: md5
+      md5: 845166458f965b4d5124768d30b69a7b
+      size: 22467
     - path: data/mfcc_data/
       hash: md5
-      md5: 7762e794faafd8da85957780d407884e.dir
-      size: 743680
-      nfiles: 51
+      md5: f4a86669b38664176cf2bf814c1c748a.dir
+      size: 1747860
+      nfiles: 346
     - path: src/draw_data.py
       hash: md5
-      md5: 50202bf83755cd394f512d339831ce0a
-      size: 4293
+      md5: 23f536df29e5a682d4b3b6e02a1b2ea4
+      size: 5331
     params:
       params.yaml:
         chunk_overlap: 250
@@ -175,5 +184,43 @@ stages:
     outs:
     - path: data/balanced_data.h5
       hash: md5
-      md5: ae94d6f2688ca6fa0017ae9194562563
-      size: 1455648
+      md5: e402e0363705eb8aba08436b2d670401
+      size: 3437544
+  augmentation:
+    cmd: python src/augment_data.py
+    deps:
+    - path: data/annotation_per_row_data.csv
+      hash: md5
+      md5: 5b4e4aed8f6bdc5f7f12165ab4703003
+      size: 6187
+    - path: data/audio
+      hash: md5
+      md5: 76e7b567abe76d809d629e6189db13d2.dir
+      size: 14636020
+      nfiles: 51
+    - path: src/augment_data.py
+      hash: md5
+      md5: fe1a706fadb260c686b68a6508e5f34b
+      size: 5420
+    params:
+      params.yaml:
+        augmentation:
+          snrs_db:
+          - -5
+          - 0
+          - 5
+          - 10
+          - 15
+          pairs_per_signal_chunk: 1
+        chunk_overlap: 250
+        chunk_size: 2000
+    outs:
+    - path: data/augmented_annotations.csv
+      hash: md5
+      md5: 845166458f965b4d5124768d30b69a7b
+      size: 22467
+    - path: data/augmented_audio
+      hash: md5
+      md5: 4b2dcbee9dea2c79e4e8ffdef2b778e7.dir
+      size: 18892980
+      nfiles: 295

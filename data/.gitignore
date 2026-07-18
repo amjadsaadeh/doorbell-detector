@@ -7,3 +7,5 @@
 /balanced_data.csv
 /balanced_data.h5
 /mfcc_data
+/augmented_audio
+/augmented_annotations.csv

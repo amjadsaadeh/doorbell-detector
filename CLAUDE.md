@@ -13,7 +13,8 @@ to train an XGBoost bell classifier.
 
 `uv run dvc repro` runs the full chain:
 `fetch_labeled_data` (Label Studio CSV export) → `convert_labeled_data` →
-`download_audio` (S3) → `extract_data_quality` / `extract_features` (MFCC) →
+`download_audio` (S3) → `extract_data_quality` / `augmentation` (SNR-mixed synthetic
+`front_doorbell` samples) → `extract_features` (MFCC, real + augmented audio) →
 `draw_data` (chunking + balancing) → `train_model` (XGBoost + dvclive).
 
 - **Storage layout:** bucket `doorbell-detector` on MinIO — `raw/` (audio, Label Studio
@@ -38,6 +39,19 @@ to train an XGBoost bell classifier.
 - `extract_mfcc_features.py` downmixes to mono — stereo uploads would silently double
   the MFCC frame rate and break chunking.
 - Requires `ffmpeg`/`ffprobe` on the host (pydub `mediainfo`).
+- **Augmentation (`augment_data.py`):** grows the minority `front_doorbell` class by
+  mixing real doorbell chunks (signal) with real background chunks (noise) via simple
+  addition at each `augmentation.snrs_db` target SNR (`params.yaml`; `flat_doorbell` is
+  excluded — too little raw data to seed it). Output rows carry `end = (chunk_size +
+  1) / 1000`, 1ms past the real chunk length; this is a deliberate metadata trick so
+  `draw_data.py`'s sliding-window loop emits exactly one `chunk_start=0` window per
+  augmented file, reusing the real-annotation chunking path unmodified.
+- `get_mfcc_features` in `draw_data.py` slices chunks using a **fixed**
+  `sample_rate/hop_length` frame rate, not `mfccs.shape[1] / file_duration`. The latter
+  is biased by librosa's constant `+1` frame-count offset — negligible for long real
+  files (always rounded to the same width) but dominant for exactly `chunk_size`-long
+  augmented clips (rounded to a different width), which broke `np.vstack` in
+  `train_xgboost.py` once augmented and real chunks were trained together.
 
 ## GSD Workflow
 
@@ -93,7 +107,8 @@ matching, GPIO button trigger, Prometheus metrics/health endpoint.
 | `src/fetch_data.sh` | Label Studio CSV export (JWT token exchange) |
 | `src/convert_labeled_data.py` | Export → annotation-per-row CSV; URI normalization; tag-only → background |
 | `src/download_audio.py` | Incremental S3 audio download (boto3) with pruning |
-| `src/extract_mfcc_features.py` | MFCC extraction (mono-downmixed) |
+| `src/augment_data.py` | SNR-mixed synthetic `front_doorbell` samples (signal+noise addition) |
+| `src/extract_mfcc_features.py` | MFCC extraction (mono-downmixed; real + augmented audio) |
 | `src/draw_data.py` | Chunking, background balancing → `balanced_data.h5` |
 | `src/train_xgboost.py` | XGBoost training with dvclive metrics |
 | `params.yaml` | ML pipeline parameters (not used by detector) |

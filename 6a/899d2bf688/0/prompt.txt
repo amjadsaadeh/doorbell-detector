@@ -1,0 +1,5 @@
+check the Data quality measures. how much imbalance is in my cirrent dataset?
+
+---
+
+OK excluse flat door bell at the Moment. add a Stage before Draw Data called "augmentation". this Stage should Mix Background chunks and non Background chunks using simple Addition, creating more Data with front_doorbell Label. as param there should be a list of SNRs which define how These chunks should be Mixed (interpreting doorbell as Signal and everything else as noise). Propose a First Set of snrs for the augmentation Stage.

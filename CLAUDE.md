@@ -90,9 +90,7 @@ matching, GPIO button trigger, Prometheus metrics/health endpoint.
 - Cross-correlation is slow enough to drop audio in saved clips if not handled carefully (see `c8c2788`)
 - Root `requirements.txt` was removed — `pyproject.toml`/`uv.lock` is the single source
   of pipeline dependencies (`data_collection/requirements.txt` remains for the Pi)
-- Pre-existing test failures in `detector_test.py` and `feature_extraction_test.py`
-  (test-signature drift) — unrelated to the pipeline; run tests with
-  `PYTHONPATH=./src:. uv run pytest tests/`
+- All 44 tests pass; run with `PYTHONPATH=./src:. uv run pytest tests/`
 
 ## Key Files
 

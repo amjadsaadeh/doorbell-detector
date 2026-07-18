@@ -7,11 +7,14 @@ Covers:
   - save_clip(): WAV file writing correctness and error safety
 """
 
+import os
 import sys
 import tempfile
 import unittest
 import wave
 from pathlib import Path
+from unittest import mock
+
 import numpy as np
 
 # Add data_collection/ to the import path so the module can be imported
@@ -249,14 +252,16 @@ class TestSaveArgs(unittest.TestCase):
         self.assertEqual(args.save_dir, "recordings")
 
     def test_buffer_minutes_default(self):
-        """--buffer-minutes must default to 0.5."""
-        args = self._parse()
-        self.assertAlmostEqual(args.buffer_minutes, 0.5)
+        """--buffer-minutes must default to BUFFER_SECONDS env var (seconds) / 60."""
+        with mock.patch.dict(os.environ, {"BUFFER_SECONDS": "3"}):
+            args = self._parse()
+        self.assertAlmostEqual(args.buffer_minutes, 3 / 60)
 
     def test_post_trigger_seconds_default(self):
-        """--post-trigger-seconds must default to 3.0."""
-        args = self._parse()
-        self.assertAlmostEqual(args.post_trigger_seconds, 3.0)
+        """--post-trigger-seconds must default to POST_TRIGGER_MINUTES env var (minutes) * 60."""
+        with mock.patch.dict(os.environ, {"POST_TRIGGER_MINUTES": "0.1"}):
+            args = self._parse()
+        self.assertAlmostEqual(args.post_trigger_seconds, 0.1 * 60)
 
     def test_save_flag_sets_true(self):
         """--save flag must set args.save to True."""

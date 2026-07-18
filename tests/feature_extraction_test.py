@@ -37,17 +37,17 @@ class TestExtractMFCCFeatures(unittest.TestCase):
         self.assertEqual(len(list(self.output_path.glob('*.npy'))), len(list(self.input_path.glob('*.wav'))), "Number of output files does not match the number of input files")
 
     def test_extract_mfcc_features(self):
-        mfccs = extract_mfcc_features(self.input_path / 'test_audio.wav', 0, 1000, 13, 512)
+        mfccs = extract_mfcc_features(self.input_path / 'test_audio.wav', 13, 512)
         self.assertIsInstance(mfccs, np.ndarray, "MFCC features are not returned as a numpy array")
         self.assertEqual(mfccs.shape[0], 13, "Number of MFCC features does not match the expected value")
 
     def test_invalid_audio_path(self):
         with self.assertRaises(FileNotFoundError):
-            extract_mfcc_features(self.input_path / 'invalid_audio.wav', 0, 1000, 13, 512)
+            extract_mfcc_features(self.input_path / 'invalid_audio.wav', 13, 512)
 
     def test_invalid_params(self):
         with self.assertRaises(ValueError):
-            extract_mfcc_features(self.input_path / 'test_audio.wav', 0, 1000, -1, 512)
+            extract_mfcc_features(self.input_path / 'test_audio.wav', 13, -1)
 
 
 if __name__ == '__main__':

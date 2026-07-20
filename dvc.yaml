@@ -67,11 +67,17 @@ stages:
     - src/draw_data.py
     outs:
     - data/balanced_data.h5
+    - data/data_quality/chunk_balanced_quality.json
+    - data/data_quality/chunks_per_label.csv
 
   train_model:
     cmd: python src/train_xgboost.py
     deps:
     - data/balanced_data.h5
+    - data/data_quality/sample_based_quality.json
+    - data/data_quality/samples_per_label.csv
+    - data/data_quality/chunk_balanced_quality.json
+    - data/data_quality/chunks_per_label.csv
     - src/train_xgboost.py
     params:
     - model

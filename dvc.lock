@@ -136,12 +136,28 @@ stages:
     deps:
     - path: data/balanced_data.h5
       hash: md5
-      md5: e402e0363705eb8aba08436b2d670401
+      md5: 685bddedd954434b47abd5eb3e65cd35
       size: 3437544
+    - path: data/data_quality/chunk_balanced_quality.json
+      hash: md5
+      md5: 8894187097739e6cc9502329ff6271f5
+      size: 103
+    - path: data/data_quality/chunks_per_label.csv
+      hash: md5
+      md5: 1e1a366031428c893412b7d15d8fe314
+      size: 42
+    - path: data/data_quality/sample_based_quality.json
+      hash: md5
+      md5: cc8dcdc4b81a278580abf9af57e5e77b
+      size: 102
+    - path: data/data_quality/samples_per_label.csv
+      hash: md5
+      md5: b1a872921f089791572da317cc8646b2
+      size: 55
     - path: src/train_xgboost.py
       hash: md5
-      md5: a94f24210bcef0f336e549a5ed51ad8e
-      size: 2192
+      md5: 70cc174ed2e6314981254ed6eaf315a4
+      size: 4420
     params:
       params.yaml:
         model:
@@ -149,6 +165,9 @@ stages:
           max_depth: 6
           learning_rate: 0.1
           random_state: 42
+          eval_metric:
+          - logloss
+          - error
         training:
           test_size: 0.2
     outs:
@@ -184,8 +203,16 @@ stages:
     outs:
     - path: data/balanced_data.h5
       hash: md5
-      md5: e402e0363705eb8aba08436b2d670401
+      md5: 685bddedd954434b47abd5eb3e65cd35
       size: 3437544
+    - path: data/data_quality/chunk_balanced_quality.json
+      hash: md5
+      md5: 8894187097739e6cc9502329ff6271f5
+      size: 103
+    - path: data/data_quality/chunks_per_label.csv
+      hash: md5
+      md5: 1e1a366031428c893412b7d15d8fe314
+      size: 42
   augmentation:
     cmd: python src/augment_data.py
     deps:

@@ -22,3 +22,4 @@ model:
   max_depth: 6
   learning_rate: 0.1
   random_state: 42
+  eval_metric: ["logloss", "error"]

@@ -1,3 +1,4 @@
+import json
 import os
 from pathlib import Path
 
@@ -13,6 +14,48 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
 
 MLFLOW_EXPERIMENT_NAME = "doorbell-detector"
+
+DATA_QUALITY_DIR = Path("./data/data_quality")
+# (json file, metric prefix) pairs produced by extract_data_quality.py (raw,
+# pre-chunking annotations) and draw_data.py (post-chunking/balancing) —
+# logged to MLflow so quality of the data feeding a run is tied to its
+# model/loss metrics.
+DATA_QUALITY_METRIC_FILES = [
+    ("sample_based_quality.json", "dq_raw"),
+    ("chunk_balanced_quality.json", "dq_balanced"),
+]
+DATA_QUALITY_ARTIFACT_FILES = [
+    "sample_based_quality.json",
+    "chunk_balanced_quality.json",
+    "samples_per_label.csv",
+    "chunks_per_label.csv",
+]
+
+
+def log_data_quality():
+    for filename, prefix in DATA_QUALITY_METRIC_FILES:
+        path = DATA_QUALITY_DIR / filename
+        with open(path) as f:
+            metrics = json.load(f)
+        mlflow.log_metrics(
+            {
+                f"{prefix}_{key}": value
+                for key, value in metrics.items()
+                if value is not None
+            }
+        )
+
+    for filename in DATA_QUALITY_ARTIFACT_FILES:
+        mlflow.log_artifact(DATA_QUALITY_DIR / filename, artifact_path="data_quality")
+
+
+def compute_metrics(y_true, y_pred, prefix):
+    report = classification_report(y_true, y_pred, output_dict=True)
+    return {
+        f"{prefix}_f1_score": report["weighted avg"]["f1-score"],
+        f"{prefix}_recall": report["weighted avg"]["recall"],
+        f"{prefix}_precision": report["weighted avg"]["precision"],
+    }
 
 
 def prepare_data(df):
@@ -50,20 +93,30 @@ def main():
 
     with mlflow.start_run():
         mlflow.log_param("test_size", params["training"]["test_size"])
+        # eval_set order below drives XGBoost's auto-generated eval names,
+        # which is what the per-round loss curve in MLflow gets logged under.
+        mlflow.log_param("eval_set_names", "validation_0=train, validation_1=test")
+        log_data_quality()
 
-        # Train model
+        # Train model. Passing both train and test as eval_set makes XGBoost
+        # report train/test eval_metric every boosting round, which
+        # mlflow.xgboost.autolog logs as stepped metrics -> the loss curve.
         model = xgb.XGBClassifier(objective="binary:logistic", **model_params)
-        model.fit(X_train, y_train, eval_set=[(X_test, y_test)], verbose=True)
+        model.fit(
+            X_train,
+            y_train,
+            eval_set=[(X_train, y_train), (X_test, y_test)],
+            verbose=True,
+        )
 
         # Evaluate and save metrics
         y_pred = model.predict(X_test)
         y_pred_decoded = le.inverse_transform(y_pred)
         y_test_decoded = le.inverse_transform(y_test)
-        report = classification_report(y_test, y_pred, output_dict=True)
+        y_train_pred = model.predict(X_train)
 
-        mlflow.log_metric("f1_score", report["weighted avg"]["f1-score"])
-        mlflow.log_metric("recall", report["weighted avg"]["recall"])
-        mlflow.log_metric("precision", report["weighted avg"]["precision"])
+        mlflow.log_metrics(compute_metrics(y_train, y_train_pred, "train"))
+        mlflow.log_metrics(compute_metrics(y_test, y_pred, "val"))
 
         fig, ax = plt.subplots()
         ConfusionMatrixDisplay.from_predictions(y_test_decoded, y_pred_decoded, ax=ax)

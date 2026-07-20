@@ -2,3 +2,5 @@
 /samples_per_label.json
 /samples_per_label.csv
 /sample_based_quality.json
+/chunk_balanced_quality.json
+/chunks_per_label.csv

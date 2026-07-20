@@ -1,0 +1,449 @@
+create a plan on integrating mlflow
+
+---
+
+<task-notification>
+<task-id>a054606075809bce9</task-id>
+<tool-use-id>toolu_01W4htrgjew2rhqMvLHY1tZq</tool-use-id>
+<output-file>/tmp/claude-1000/-home-orchid-projects-doorbell-detector/9298e537-72f8-4fb8-b9a0-a2ce4d76c687/tasks/a054606075809bce9.output</output-file>
+<status>completed</status>
+<summary>Agent "Explore ML pipeline training setup" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result># Investigation Report: doorbell-detector ML Training Pipeline (for MLflow integration planning)
+
+## 1. `src/train_xgboost.py` — full contents
+
+```python
+import pandas as pd
+import numpy as np
+from pathlib import Path
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import classification_report
+import xgboost as xgb
+import yaml
+from dvclive.xgb import DVCLiveCallback
+from dvclive import Live
+from sklearn.preprocessing import LabelEncoder
+
+
+def prepare_data(df):
+    # Convert MFCC features to 1D arrays
+    X = np.vstack([x.flatten() for x in df["mfcc_features"]])
+    # Convert labels to binary (background=0, non-background=1)
+    le = LabelEncoder()
+    # Convert to inary problem
+    df["label"] = df["label"].apply(
+        lambda x: "background" if x == "background" else "bell"
+    )
+    y = le.fit_transform(df["label"])
+    return X, y, le
+
+
+def main():
+
+    with open("params.yaml", "r") as file:
+        params = yaml.safe_load(file)
+        
+    model_params = params["model"]
+
+    # Load data
+    df = pd.read_hdf("./data/balanced_data.h5", key="data")
+    X, y, le = prepare_data(df)
+
+    # Split data
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=params["training"]["test_size"], random_state=42, stratify=y
+    )
+
+    with Live() as live:
+        # Train model
+        model = xgb.XGBClassifier(
+            objective="binary:logistic", callbacks=[DVCLiveCallback()], **model_params
+        )
+        model.fit(X_train, y_train, eval_set=[(X_test, y_test)], verbose=True)
+
+        # Evaluate and save metrics
+        y_pred = model.predict(X_test)
+        y_pred_decoded = le.inverse_transform(y_pred)
+        y_test_decoded = le.inverse_transform(y_test)
+        report = classification_report(y_test, y_pred, output_dict=True)
+
+        live.log_sklearn_plot("confusion_matrix", y_test_decoded, y_pred_decoded)
+        live.log_metric("f1_score", report["weighted avg"]["f1-score"])
+        live.log_metric("recall", report["weighted avg"]["recall"])
+        live.log_metric("precision", report["weighted avg"]["precision"])
+        # Save model
+        model_path = Path("./models/xgboost_model.json")
+        model_path.parent.mkdir(exist_ok=True)
+        model.save_model(model_path)
+        live.log_artifact(model_path)
+
+
+if __name__ == "__main__":
+    main()
+```
+
+**dvclive usage specifics:**
+- `Live()` context manager wraps the whole train+eval block.
+- `DVCLiveCallback()` is passed to `xgb.XGBClassifier(callbacks=[...])` — dvclive auto-logs per-boosting-round eval metrics (train/test logloss etc., from `eval_set`) via this callback, not manually.
+- Manually logged metrics: `f1_score`, `recall`, `precision` (all "weighted avg" from `classification_report`, computed on the *encoded* `y_test`/`y_pred`, not the decoded labels — note the confusion matrix plot uses the decoded string labels but the metrics use the encoded/binary ones).
+- `live.log_sklearn_plot("confusion_matrix", ...)` — a plot artifact, not a scalar metric.
+- `live.log_artifact(model_path)` — logs the saved model file as a dvclive artifact.
+- **No explicit `live.log_param(...)` calls** — hyperparameters aren't logged into dvclive directly by this script; they come from `dvc.yaml`'s `params:` stage declaration (`model`, `training` keys in `params.yaml`), which DVC itself tracks via `dvc.lock`/`Live()`'s automatic params capture (dvclive auto-detects `params.yaml` in the working dir).
+- Model format: XGBoost's own native serialization via `model.save_model(model_path)` to `models/xgboost_model.json` — plain XGBoost JSON, not pickle/joblib, not an MLflow flavor.
+- Hyperparameters used (all from `params.yaml` → `model:` key, splatted into `XGBClassifier(**model_params)`): `n_estimators`, `max_depth`, `learning_rate`, `random_state`. `objective="binary:logistic"` is hardcoded in the script, not in params.yaml. `test_size` comes from `params.yaml` → `training.test_size`.
+
+## 2. `dvc.yaml` — full contents
+
+Full pipeline has 7 stages: `convert_labeled_data`, `fetch_labeled_data`, `download_audio`, `extract_data_quality`, `augmentation`, `extract_features`, `draw_data`, `train_model`.
+
+The `train_model` stage specifically (lines 71-80):
+```yaml
+train_model:
+    cmd: python src/train_xgboost.py
+    deps:
+    - data/balanced_data.h5
+    - src/train_xgboost.py
+    params:
+    - model
+    - training
+    outs:
+    - models/xgboost_model.json
+```
+
+Top-level `metrics:` block (line 82-85) includes `dvclive/metrics.json` (the dvclive-tracked metrics file). Top-level `plots:` block includes `dvclive/plots/metrics` and `dvclive/plots/sklearn/confusion_matrix.json` (dvclive outputs), plus a data-quality bar chart. Top-level `params:` references `params.yaml` as a whole (line 102-103). Note `models/xgboost_model.json` is declared as a plain DVC `outs:` (not `persist: true`, unlike `data/audio`), and dvclive's own output directory (`dvclive/`) is not declared as an explicit `outs:` in the stage but is referenced via the `metrics:`/`plots:` sections — DVC tracks it implicitly through those declarations.
+
+## 3. `params.yaml` — full contents
+
+```yaml
+chunk_size: 2000 # ms
+chunk_overlap: 250 #ms
+inbalance_ratio: 1.0 # How much more background samples should be drawn
+
+augmentation:
+  snrs_db: [-5, 0, 5, 10, 15]
+  pairs_per_signal_chunk: 1
+
+feature_extraction:
+  n_mfcc: 13
+  n_fft: 512
+
+training:
+  test_size: 0.2
+
+model:
+  n_estimators: 25
+  max_depth: 6
+  learning_rate: 0.1
+  random_state: 42
+```
+
+Only `model` and `training` keys are consumed by `train_xgboost.py`/declared as params for the `train_model` stage; the rest feed earlier stages.
+
+## 4. Dependencies (`pyproject.toml` / `uv.lock`)
+
+- `pyproject.toml`: `requires-python = "&gt;=3.12"`, package manager is `uv` (confirmed by `uv.lock` presence, and CLAUDE.md/README instruct `uv run ...`).
+- `dvclive==3.48.1` **is** a pinned dependency (pyproject.toml line 54, uv.lock lines 874, 1194-1210).
+- `xgboost==2.1.3` is a pinned dependency (pyproject.toml line 183, uv.lock line 1003/3382).
+- `dvc==3.56.0`, `dvc-s3&gt;=3.2.0` (S3-compatible remote support), `label-studio-sdk==1.0.7` also present.
+- **`mlflow` is NOT present anywhere** — not in `pyproject.toml`, not in `uv.lock`, not in `data_collection/requirements.txt` (Pi runtime deps).
+
+## 5. Existing "mlflow" references in the doorbell-detector repo itself
+
+**None.** A repo-wide grep across `*.py`, `*.md`, `*.yaml`, `*.yml`, `*.toml` (excluding `.venv`) returned zero hits for "mlflow" in code, docs, `.planning/`, or `CLAUDE.md`.
+
+## 6. `.planning/STATE.md`, `ROADMAP.md`, `REQUIREMENTS.md`
+
+These three files document a **completed, unrelated milestone** — the v1.0 "Pattern-Matching Doorbell Detector" (`data_collection/detector.py`, cross-correlation-based, explicitly built to work *without* the ML model — see STATE.md line 23: "Detect the doorbell reliably without requiring the trained ML model"). No mention of MLflow, experiment tracking, or model registry in any of the three. Deferred v2 items listed in STATE.md are: multiple template files, FFT frequency-domain matching, GPIO button trigger, Prometheus metrics/health endpoint — none ML/tracking related.
+
+There is also a **separate, older root-level `ROADMAP.md`** (distinct from `.planning/ROADMAP.md`) with a backlog including "DVC Remote Migration" (mentions DagsHub/self-hosted MinIO) and a "Makefile" idea with a `dvc exp run` example — no MLflow mention there either, but it does show the project has already considered experiment-tracking-adjacent workflow ideas (`dvc exp run --set-param ...`, `dvc metrics show`, `dvc exp show`).
+
+## 7. Credentials / `.env` structure
+
+- `.env` exists (git-ignored per `.gitignore` line 4), no `.env.example` committed.
+- `.env` variable names (values not read): `LABEL_STUDIO_URL`, `LABEL_STUDIO_API_KEY`, `AWS_ENDPOINT_URL`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`.
+- Loaded via `set -a; source .env; set +a` before running `dvc repro`/`dvc push` (per CLAUDE.md and README.md).
+- `.dvc/config`:
+```ini
+[core]
+    autostage = true
+    remote = storage
+['remote "storage"']
+    url = s3://doorbell-detector/dvc
+    endpointurl = http://192.168.178.126:9000
+```
+  This is the internal/LAN endpoint for the self-hosted MinIO (note: distinct from its public ingress hostname found in the infra repo, see #9 below).
+- `src/download_audio.py` line 59: `boto3.client("s3", endpoint_url=os.getenv("AWS_ENDPOINT_URL"))` — standard boto3 credential chain, MinIO-compatible via endpoint override.
+- Bucket layout (per README.md/CLAUDE.md): bucket `doorbell-detector` on MinIO, with `raw/` (audio, Label Studio source storage), `annotations/` (Label Studio target-storage sync backup), `dvc/` (DVC remote).
+
+## 8. `data_collection/detector.py` and `data_collection/data_collector.py`
+
+- **`detector.py`** (the currently-deployed production script) does **not** load any ML model at all — it's pure cross-correlation pattern matching against a WAV template (per its own docstring and `.planning/REQUIREMENTS.md` "Out of Scope: ML/XGBoost inference — belongs to `data_collector.py`").
+- **`data_collector.py`** (older ML-based script, not currently the production deployment) **does** load the trained model directly:
+```python
+# line 355-357
+model = xgb.Booster()
+model.load_model(args.model_path)
+log.info("Loaded XGBoost model from %s", args.model_path)
+```
+  This uses XGBoost's native `Booster.load_model()` on the same JSON file format written by `train_xgboost.py` (`args.model_path` defaults presumably to `models/xgboost_model.json`). Inference further downstream (not fully re-read but visible around line 396-399) computes MFCCs from raw audio chunks and feeds them to the booster — a direct, no-abstraction load-and-predict, with no MLflow model-serving/registry layer today. This is the code path that would need updating if MLflow model registry/versioned loading replaced the flat file path.
+- `data_collection/requirements.txt` is the separate Pi-side runtime dependency file (distinct from root `pyproject.toml`); no mlflow there either.
+
+## 9. Self-hosting configs — Docker/compose in this repo vs. the sibling infra repo
+
+- **No Dockerfile, docker-compose.yml, or self-hosted service manifests exist inside `doorbell-detector` itself** (only false-positive matches inside `.venv/`).
+- However, the sibling repo **`saadeh.dev-infrastructure`** (an additional working directory available in this session) hosts MinIO, Label Studio, **and already has an MLflow deployment** as Kubernetes/Helm services:
+  - `services/minio/values.yaml`: standalone MinIO on Longhorn PVC, ingress at `s3.saadeh.dev` (API) and `minio.saadeh.dev` (console), bucket `labelstudio` pre-provisioned. (Note: doorbell-detector's `.dvc/config` talks to it via internal LAN IP `192.168.178.126:9000`, not the public `s3.saadeh.dev` hostname — likely a direct in-cluster/LAN address rather than through the Traefik ingress.)
+  - `services/labelstudio/values.yaml`: Label Studio backed by CloudNative-PG postgres, ingress at `labelstudio.saadeh.dev`.
+  - `services/mlflow/` (namespace.yaml, cert.yaml, pvc.yaml, values.yaml) — **an MLflow server is already defined/deployed** on this cluster:
+    - Ingress host: `mlflow.saadeh.dev`, Traefik + cert-manager TLS.
+    - Backend store: CloudNative-PG postgres (`pgcluster-rw.cloudnative-pg.svc.cluster.local:5432`, db `mlflow`, user `mlflow`, credentials via `mlflow-db-secret`).
+    - Artifact store: currently a Longhorn PVC (`mlflow-pvc`, 20Gi) mounted at `/mlflow`, with `artifactRoot.defaultArtifactRoot: /mlflow/artifacts` — **not currently pointed at the MinIO S3 bucket**, it's local PVC-backed artifact storage as deployed today.
+    - Auth: basic auth via `mlflow-auth-secret` (chart-native `auth.enabled: true`) in the current `values.yaml`; the deployment plan docs (`docs/plans/2026-03-28-mlflow-deployment.md`) additionally describe an alternate Traefik BasicAuth `Middleware` CRD approach — the two docs (`2026-03-28-mlflow-deployment.md` and `2026-03-28-mlflow-postgres-backend.md`) show the evolution from SQLite+env-var tracking URI to the current Postgres-backed `backendStore.postgres.*` config now in `services/mlflow/values.yaml`.
+    - Helm chart used: `community-charts/mlflow` (from `community-charts` Helm repo).
+  - This means an MLflow tracking server may already be **live and reachable at `https://mlflow.saadeh.dev`** independent of any work needed in `doorbell-detector` — the integration task may be purely client-side (pointing `MLFLOW_TRACKING_URI` + credentials from the doorbell-detector `.env`/pipeline at this existing server) rather than needing to stand up new infrastructure. Its artifact root is currently a dedicated PVC, not the MinIO bucket used by DVC, so reusing the same MinIO bucket as an MLflow artifact store (as hinted in the task) would require changing `artifactRoot`/`extraFlags: [serve-artifacts]` config in that infra repo, not just doorbell-detector.</result>
+<usage><subagent_tokens>61958</subagent_tokens><tool_uses>13</tool_uses><duration_ms>171283</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>acdbb0f4a8363e376</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/tmp/claude-1000/-home-orchid-projects-doorbell-detector/9298e537-72f8-4fb8-b9a0-a2ce4d76c687/tasks/acdbb0f4a8363e376.output</output-file>
+<status>completed</status>
+<summary>Agent "Design MLflow integration plan" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>No Write tool is available in this session, so I'm delivering the complete implementation plan below as my final response (per my role's instructions to return findings directly rather than write a report file).
+
+# Implementation Plan: MLflow Tracking Alongside dvclive
+
+## Design Summary
+
+Add MLflow as a second, best-effort observer inside the same `Live()` block in `src/train_xgboost.py`. Use `mlflow.xgboost.autolog()` (not the blanket `mlflow.autolog()`) for per-round metrics/params/model logging, wrap run creation in a network-failure-tolerant helper so a downed `mlflow.saadeh.dev` never fails `dvc repro`, and gate the whole feature on the presence of `MLFLOW_TRACKING_URI` in the environment so it's fully opt-in and requires zero `dvc.yaml`/`params.yaml` changes.
+
+## 1. `src/train_xgboost.py` — exact diff
+
+```python
+import os
+import subprocess
+import warnings
+from contextlib import nullcontext
+from pathlib import Path
+
+import mlflow
+import mlflow.xgboost
+import numpy as np
+import pandas as pd
+import xgboost as xgb
+import yaml
+from dvclive import Live
+from dvclive.xgb import DVCLiveCallback
+from sklearn.metrics import classification_report
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import LabelEncoder
+
+MLFLOW_EXPERIMENT_NAME = "doorbell-detector"
+
+
+def prepare_data(df):
+    X = np.vstack([x.flatten() for x in df["mfcc_features"]])
+    le = LabelEncoder()
+    df["label"] = df["label"].apply(
+        lambda x: "background" if x == "background" else "bell"
+    )
+    y = le.fit_transform(df["label"])
+    return X, y, le
+
+
+def _git_sha():
+    try:
+        return (
+            subprocess.check_output(["git", "rev-parse", "--short", "HEAD"])
+            .decode()
+            .strip()
+        )
+    except Exception:
+        return "unknown"
+
+
+def setup_mlflow():
+    """Best-effort MLflow setup. Returns True if the tracking server is
+    configured and reachable, False if mlflow tracking should be skipped
+    for this run. Never raises — a missing/unreachable MLflow server must
+    not fail the dvc repro training stage, only dvclive tracking is
+    required for pipeline reproducibility."""
+    tracking_uri = os.environ.get("MLFLOW_TRACKING_URI")
+    if not tracking_uri:
+        return False
+    try:
+        mlflow.set_tracking_uri(tracking_uri)
+        mlflow.set_experiment(MLFLOW_EXPERIMENT_NAME)
+        # xgboost-specific autolog only -- NOT the blanket mlflow.autolog(),
+        # which would also patch sklearn and autolog train_test_split /
+        # LabelEncoder calls above, polluting the run.
+        mlflow.xgboost.autolog(log_models=True, log_datasets=False)
+        return True
+    except Exception as exc:
+        warnings.warn(f"MLflow tracking unavailable, continuing with dvclive only: {exc}")
+        return False
+
+
+def start_mlflow_run(enabled):
+    if not enabled:
+        return nullcontext()
+    try:
+        run = mlflow.start_run(run_name=f"train-{_git_sha()}")
+        dvc_exp_name = os.environ.get("DVC_EXP_NAME")
+        if dvc_exp_name:
+            mlflow.set_tag("dvc_exp_name", dvc_exp_name)
+        mlflow.set_tag("git_sha", _git_sha())
+        return run
+    except Exception as exc:
+        warnings.warn(f"MLflow run creation failed, continuing with dvclive only: {exc}")
+        return nullcontext()
+
+
+def main():
+    with open("params.yaml", "r") as file:
+        params = yaml.safe_load(file)
+    model_params = params["model"]
+
+    df = pd.read_hdf("./data/balanced_data.h5", key="data")
+    X, y, le = prepare_data(df)
+
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=params["training"]["test_size"], random_state=42, stratify=y
+    )
+
+    mlflow_enabled = setup_mlflow()
+
+    with Live() as live, start_mlflow_run(mlflow_enabled):
+        if mlflow_enabled:
+            try:
+                # autolog captures every XGBClassifier constructor kwarg
+                # automatically; test_size isn't passed to the estimator,
+                # so log it explicitly for parity with dvclive/params.yaml.
+                mlflow.log_param("test_size", params["training"]["test_size"])
+            except Exception as exc:
+                warnings.warn(f"MLflow param logging failed: {exc}")
+
+        model = xgb.XGBClassifier(
+            objective="binary:logistic", callbacks=[DVCLiveCallback()], **model_params
+        )
+        model.fit(X_train, y_train, eval_set=[(X_test, y_test)], verbose=True)
+
+        y_pred = model.predict(X_test)
+        y_pred_decoded = le.inverse_transform(y_pred)
+        y_test_decoded = le.inverse_transform(y_test)
+        report = classification_report(y_test, y_pred, output_dict=True)
+
+        live.log_sklearn_plot("confusion_matrix", y_test_decoded, y_pred_decoded)
+        live.log_metric("f1_score", report["weighted avg"]["f1-score"])
+        live.log_metric("recall", report["weighted avg"]["recall"])
+        live.log_metric("precision", report["weighted avg"]["precision"])
+        model_path = Path("./models/xgboost_model.json")
+        model_path.parent.mkdir(exist_ok=True)
+        model.save_model(model_path)
+        live.log_artifact(model_path)
+
+        if mlflow_enabled:
+            try:
+                mlflow.log_metric("f1_score", report["weighted avg"]["f1-score"])
+                mlflow.log_metric("recall", report["weighted avg"]["recall"])
+                mlflow.log_metric("precision", report["weighted avg"]["precision"])
+            except Exception as exc:
+                warnings.warn(f"MLflow post-fit metric logging failed: {exc}")
+
+
+if __name__ == "__main__":
+    main()
+```
+
+Notes on design decisions embedded above:
+
+- **Callback compatibility (item 1):** `xgb.XGBClassifier.fit()`'s `callbacks` list is a plain list XGBoost iterates over each boosting round. `mlflow.xgboost.autolog()` patches `fit()` to append its own internal callback to whatever list you pass — it does not replace or inspect `DVCLiveCallback`, so both run independently against the same eval events with no shared state. No conflict.
+- **Why not `mlflow.autolog()`:** the blanket autologger also enables `mlflow.sklearn.autolog()`, which would instrument `train_test_split` and `LabelEncoder.fit_transform` above the `Live()`/mlflow-run block and either create spurious autolog side effects or warn about no active run at that point. Scoping to `mlflow.xgboost.autolog()` avoids this entirely.
+- **`log_datasets=False`:** dataset lineage is already DVC's job (`balanced_data.h5` is a tracked/hashed output); disabling MLflow's dataset autologging avoids redundant hashing/overhead of the full `X_train`/`X_test` arrays.
+- **Model registry (item, scope note 2):** `log_models=True` on autolog already logs a full MLflow Model (pyfunc + native xgboost flavor) as a run artifact — this satisfies "model artifact logging" naturally. The script deliberately does **not** call `mlflow.register_model()` — registering every training run automatically would flood the registry with unpromoted models; promotion to the registry should stay a manual/deliberate step in the MLflow UI, consistent with the requirement that no Pi-deployment/registry-consumption wiring is in scope.
+- **Non-fatal design (item 5):** the pre-flight check lives in `setup_mlflow()` (a `set_experiment` call, which contacts the server) and `start_mlflow_run()` (the `start_run` call, a second server round-trip). Both are wrapped in `try/except`, degrading to `contextlib.nullcontext()` so the `with Live() as live, start_mlflow_run(...):` line always succeeds and training proceeds with dvclive alone. Metric/param calls inside the block are also individually wrapped. The one accepted gap: if the server goes down *mid-fit*, autolog's internal per-round callback could itself raise from inside `model.fit()` — this is treated as an acceptable, rare edge case rather than engineered around, to avoid conflating real XGBoost training failures with tracking-infra failures.
+
+## 2. `.env` — new variables
+
+Add three new lines, following the existing flat `KEY=value` convention (no new `.env.example` file exists in the repo today, so none is introduced):
+
+```
+MLFLOW_TRACKING_URI=https://mlflow.saadeh.dev
+MLFLOW_TRACKING_USERNAME=&lt;from password manager&gt;
+MLFLOW_TRACKING_PASSWORD=&lt;from password manager&gt;
+```
+
+Optional (recommended, not required) tuning vars to keep the pre-flight check fast when the server is down, rather than hanging on a long default TCP/HTTP timeout:
+
+```
+MLFLOW_HTTP_REQUEST_TIMEOUT=5
+```
+
+These are picked up automatically by the `mlflow` client from the environment — no code needs to read `MLFLOW_TRACKING_USERNAME`/`PASSWORD` explicitly; `mlflow.set_tracking_uri()` + the ambient env vars are all `mlflow`'s auth layer needs for HTTP basic auth. Loaded the same way as today: `set -a; source .env; set +a` before `dvc repro`.
+
+Because `setup_mlflow()` no-ops when `MLFLOW_TRACKING_URI` is unset, these three vars are effectively optional — someone running the pipeline without MLflow configured (e.g., CI, a contributor without credentials) is unaffected, no `.env` change is required for the pipeline to keep working exactly as today.
+
+## 3. `pyproject.toml` / `uv.lock`
+
+Run `uv add mlflow`. One caveat worth flagging back to the user before running it: there's no `mlflow[server]` extra in reality — the split is between the full `mlflow` package (bundles the tracking server + UI code, heavier deps) and `mlflow-skinny` (client-only, no bundled server/UI, lighter). Since the server already lives at `mlflow.saadeh.dev` and this repo only ever needs the *client*, `mlflow-skinny` is arguably the more precise match for "client library only, not the full server" — but the explicit instruction was `uv add mlflow`, so that's what's specified here; swap to `uv add mlflow-skinny` if the lighter footprint is preferred (functionally equivalent for everything `train_xgboost.py` does).
+
+`uv add` will record something like `"mlflow&gt;=2.x.y"` in `pyproject.toml`'s `dependencies` list by default. Every other entry in this file is pinned exact (`==`), generated from a fully resolved lock. To match that convention, after `uv add mlflow` resolves and writes `uv.lock`, manually tighten the `pyproject.toml` line to `"mlflow==&lt;resolved-version&gt;"` (read the resolved version straight out of `uv.lock`) so it's consistent with the rest of the dependency block style.
+
+## 4. `dvc.yaml` — no changes
+
+`train_model`'s `deps`/`params`/`outs` stay exactly as-is. `MLFLOW_TRACKING_URI`/`MLFLOW_TRACKING_USERNAME`/`MLFLOW_TRACKING_PASSWORD` are runtime/infra config, not reproducibility-relevant model inputs — this mirrors the existing precedent where `AWS_*`/`LABEL_STUDIO_*` creds are loaded from `.env` and never appear in `dvc.yaml`'s `params:` stanza either. The top-level `metrics:`/`plots:` blocks (`dvclive/metrics.json`, `dvclive/plots/metrics`, `dvclive/plots/sklearn/confusion_matrix.json`) are untouched since dvclive's write paths in the script are unchanged.
+
+## 5. `CLAUDE.md` edits
+
+In the **ML Data Pipeline (DVC)** section, extend the pipeline-chain sentence and the credentials bullet:
+
+- Chain description: `... → train_model (XGBoost + dvclive + MLflow)`.
+- Credentials bullet: append `MLFLOW_TRACKING_URI`, `MLFLOW_TRACKING_USERNAME`, `MLFLOW_TRACKING_PASSWORD` to the `.env` var list, with a note: *"MLflow vars are optional — `train_xgboost.py` skips MLflow entirely (dvclive-only) if `MLFLOW_TRACKING_URI` is unset or the server is unreachable at run start, so a downed tracking server never fails `dvc repro`."*
+- Add a new bullet: *"MLflow tracking (optional, alongside dvclive): experiment `doorbell-detector` at `https://mlflow.saadeh.dev` (basic-auth protected, external infra, out of scope here). Uses `mlflow.xgboost.autolog()` — not the blanket `mlflow.autolog()`, to avoid also autologging the sklearn preprocessing calls above it in `train_xgboost.py`."*
+
+In the **Key Files** table, update the `src/train_xgboost.py` row: `"XGBoost training with dvclive metrics"` → `"XGBoost training with dvclive metrics + optional MLflow tracking"`.
+
+In **Commands**, no new required command (loading is already covered by `set -a; source .env; set +a`), but could add a one-line note after the existing block: `# MLFLOW_TRACKING_URI/USERNAME/PASSWORD in .env are optional; unset = dvclive-only`.
+
+## 6. `README.md` (mirrors CLAUDE.md, also worth updating for consistency)
+
+- Step 6 of the "Training: DVC pipeline" list: `"train an XGBoost classifier, tracked with dvclive"` → `"train an XGBoost classifier, tracked with dvclive (and optionally MLflow)"`.
+- The `.env` code block under "Running It": append the three MLflow vars with a `# optional — MLflow tracking, dvclive is unaffected if unset` comment.
+
+## 7. Verification plan
+
+1. `uv add mlflow` (or `uv add mlflow-skinny`); confirm `pyproject.toml`/`uv.lock` diff is limited to the new dependency (and its transitive deps).
+2. Add the three MLflow vars to `.env` with real credentials (from the user's password manager per their existing sops/KeePass convention).
+3. `set -a; source .env; set +a`
+4. Fast local iteration: `uv run python src/train_xgboost.py` — confirm it exits 0, `models/xgboost_model.json` is written, and `dvclive/metrics.json` / `dvclive/plots/sklearn/confusion_matrix.json` are updated (unchanged behavior vs. today).
+5. Confirm MLflow side: open `https://mlflow.saadeh.dev` in a browser (or `curl -u "$MLFLOW_TRACKING_USERNAME:$MLFLOW_TRACKING_PASSWORD" "$MLFLOW_TRACKING_URI/api/2.0/mlflow/experiments/get-by-name?experiment_name=doorbell-detector"`) and verify a new run `train-&lt;sha&gt;` exists with: params (`n_estimators`, `max_depth`, `learning_rate`, `random_state`, `objective`, `test_size`), metrics (autolog's per-iteration eval metric plus the explicit `f1_score`/`recall`/`precision`), tags (`git_sha`, and `dvc_exp_name` if run via `dvc exp run`), and a `model` artifact folder.
+6. Full pipeline integration: `uv run dvc repro -s train_model -f`; confirm DVC doesn't care about the extra mlflow calls (it just executes the `cmd`), and `uv run dvc metrics diff` / `uv run dvc plots diff` still work against `dvclive/` outputs unchanged.
+7. Non-fatal check (the important negative test): temporarily set `MLFLOW_TRACKING_URI=http://localhost:1` (or unset the creds), rerun `uv run python src/train_xgboost.py`, confirm it still exits 0 with only a printed `UserWarning`, and `models/xgboost_model.json` + dvclive outputs are still produced — proving a downed MLflow server can't block `dvc repro`.
+8. Regression: `PYTHONPATH=./src:. uv run pytest tests/` — confirm all 44 existing tests still pass (no existing test file targets `train_xgboost.py`, so no test changes are required for this change, but this guards the rest of the pipeline).
+
+### Critical Files for Implementation
+- /home/orchid/projects/doorbell-detector/src/train_xgboost.py
+- /home/orchid/projects/doorbell-detector/.env
+- /home/orchid/projects/doorbell-detector/pyproject.toml
+- /home/orchid/projects/doorbell-detector/CLAUDE.md
+- /home/orchid/projects/doorbell-detector/README.md</result>
+<usage><subagent_tokens>43340</subagent_tokens><tool_uses>8</tool_uses><duration_ms>1336801</duration_ms></usage>
+</task-notification>
+
+---
+
+update the .env File with the following credentials for mlflow
+
+Username: doorbell-detector
+Password: REDACTED
+
+verify by Testing
+
+---
+
+yes remove

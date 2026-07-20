@@ -1,0 +1,37 @@
+{
+  "cli_version": "0.8.42",
+  "checkpoint_id": "6034f49e7efe",
+  "strategy": "manual-commit",
+  "branch": "main",
+  "checkpoints_count": 5,
+  "files_touched": [
+    "CLAUDE.md",
+    "README.md",
+    "dvc.yaml",
+    "dvclive/metrics.json",
+    "dvclive/plots/metrics/f1_score.tsv",
+    "dvclive/plots/metrics/precision.tsv",
+    "dvclive/plots/metrics/recall.tsv",
+    "dvclive/plots/metrics/validation_0/logloss.tsv",
+    "dvclive/plots/sklearn/confusion_matrix.json",
+    "pyproject.toml",
+    "src/train_xgboost.py",
+    "uv.lock"
+  ],
+  "sessions": [
+    {
+      "metadata": "/60/34f49e7efe/0/metadata.json",
+      "transcript": "/60/34f49e7efe/0/full.jsonl",
+      "compact_transcript": "/60/34f49e7efe/0/transcript.jsonl",
+      "content_hash": "/60/34f49e7efe/0/content_hash.txt",
+      "prompt": "/60/34f49e7efe/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 98,
+    "cache_creation_tokens": 278631,
+    "cache_read_tokens": 4510780,
+    "output_tokens": 32997,
+    "api_call_count": 49
+  }
+}

@@ -1,0 +1,82 @@
+{
+  "cli_version": "0.8.42",
+  "checkpoint_id": "051789277472",
+  "session_id": "a4e1da53-e002-4fe3-905d-c87a5b953534",
+  "strategy": "manual-commit",
+  "created_at": "2026-07-20T11:18:51.953494325Z",
+  "branch": "main",
+  "checkpoints_count": 2,
+  "save_step_count": 2,
+  "files_touched": [
+    "data/data_quality/.gitignore",
+    "data/data_quality/chunk_balanced_quality.json",
+    "data/data_quality/chunks_per_label.csv",
+    "dvc.lock",
+    "dvc.yaml",
+    "params.yaml",
+    "src/train_xgboost.py"
+  ],
+  "agent": "Claude Code",
+  "model": "",
+  "turn_id": "770a4c74b9b1",
+  "compact_transcript_start": 0,
+  "token_usage": {
+    "input_tokens": 80,
+    "cache_creation_tokens": 60198,
+    "cache_read_tokens": 2595840,
+    "output_tokens": 16181,
+    "api_call_count": 40
+  },
+  "session_metrics": {
+    "turn_count": 2
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-07-20T11:18:51.924766117Z",
+    "agent_lines": 90,
+    "agent_removed": 19,
+    "human_added": 9,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 99,
+    "total_lines_changed": 118,
+    "agent_percentage": 92.37288135593221,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 21,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        ".claude/scheduled_tasks.lock": 1,
+        ".claude/settings.local.json": 20
+      }
+    },
+    {
+      "checkpoint_number": 2,
+      "user_lines_added": 21,
+      "user_lines_removed": 0,
+      "agent_lines_added": 25,
+      "agent_lines_removed": 6,
+      "user_added_per_file": {
+        ".claude/scheduled_tasks.lock": 1,
+        ".claude/settings.local.json": 20
+      }
+    },
+    {
+      "checkpoint_number": 3,
+      "user_lines_added": 30,
+      "user_lines_removed": 0,
+      "agent_lines_added": 99,
+      "agent_lines_removed": 19,
+      "user_added_per_file": {
+        ".claude/scheduled_tasks.lock": 1,
+        ".claude/settings.local.json": 20,
+        "data/data_quality/chunk_balanced_quality.json": 6,
+        "data/data_quality/chunks_per_label.csv": 3
+      }
+    }
+  ]
+}

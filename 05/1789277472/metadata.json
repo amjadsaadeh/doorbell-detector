@@ -1,0 +1,32 @@
+{
+  "cli_version": "0.8.42",
+  "checkpoint_id": "051789277472",
+  "strategy": "manual-commit",
+  "branch": "main",
+  "checkpoints_count": 2,
+  "files_touched": [
+    "data/data_quality/.gitignore",
+    "data/data_quality/chunk_balanced_quality.json",
+    "data/data_quality/chunks_per_label.csv",
+    "dvc.lock",
+    "dvc.yaml",
+    "params.yaml",
+    "src/train_xgboost.py"
+  ],
+  "sessions": [
+    {
+      "metadata": "/05/1789277472/0/metadata.json",
+      "transcript": "/05/1789277472/0/full.jsonl",
+      "compact_transcript": "/05/1789277472/0/transcript.jsonl",
+      "content_hash": "/05/1789277472/0/content_hash.txt",
+      "prompt": "/05/1789277472/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 80,
+    "cache_creation_tokens": 60198,
+    "cache_read_tokens": 2595840,
+    "output_tokens": 16181,
+    "api_call_count": 40
+  }
+}

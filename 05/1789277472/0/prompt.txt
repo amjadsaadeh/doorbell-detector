@@ -1,0 +1,5 @@
+check the mlflow Logging for the Training. Adapt IT so Training metrics and vlidatuon metrics are logged. also the loss curve should be tracked
+
+---
+
+ok, dataquality should be also tracked by mlflow.

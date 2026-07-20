@@ -15,14 +15,19 @@ to train an XGBoost bell classifier.
 `fetch_labeled_data` (Label Studio CSV export) → `convert_labeled_data` →
 `download_audio` (S3) → `extract_data_quality` / `augmentation` (SNR-mixed synthetic
 `front_doorbell` samples) → `extract_features` (MFCC, real + augmented audio) →
-`draw_data` (chunking + balancing) → `train_model` (XGBoost + dvclive).
+`draw_data` (chunking + balancing) → `train_model` (XGBoost + MLflow).
 
 - **Storage layout:** bucket `doorbell-detector` on MinIO — `raw/` (audio, Label Studio
   source storage), `annotations/` (Label Studio target-storage sync, backup only),
   `dvc/` (DVC remote, configured in `.dvc/config`).
 - **Credentials** live in the git-ignored `.env`: `LABEL_STUDIO_URL`,
   `LABEL_STUDIO_API_KEY`, `AWS_ENDPOINT_URL`, `AWS_ACCESS_KEY_ID`,
-  `AWS_SECRET_ACCESS_KEY`. Source it before `dvc repro`/`dvc push`.
+  `AWS_SECRET_ACCESS_KEY`, `MLFLOW_TRACKING_URI`, `MLFLOW_TRACKING_USERNAME`,
+  `MLFLOW_TRACKING_PASSWORD`. Source it before `dvc repro`/`dvc push`.
+- **Experiment tracking:** `train_xgboost.py` logs params/metrics/model/confusion-matrix
+  to MLflow (experiment `doorbell-detector`) at `MLFLOW_TRACKING_URI` — a self-hosted
+  server (`https://mlflow.saadeh.dev`), not managed from this repo. `dvc metrics
+  show`/`dvc plots diff` no longer cover training metrics; check the MLflow UI instead.
 - **Label Studio auth** is a JWT personal access token: `fetch_data.sh` exchanges it
   via `/api/token/refresh` for a Bearer token (legacy `Token` header returns 401).
 - **Incrementality:** `data/audio` is a `persist: true` output — unchanged labels skip
@@ -108,9 +113,9 @@ matching, GPIO button trigger, Prometheus metrics/health endpoint.
 | `src/augment_data.py` | SNR-mixed synthetic `front_doorbell` samples (signal+noise addition) |
 | `src/extract_mfcc_features.py` | MFCC extraction (mono-downmixed; real + augmented audio) |
 | `src/draw_data.py` | Chunking, background balancing → `balanced_data.h5` |
-| `src/train_xgboost.py` | XGBoost training with dvclive metrics |
+| `src/train_xgboost.py` | XGBoost training with MLflow tracking |
 | `params.yaml` | ML pipeline parameters (not used by detector) |
-| `.env` | Git-ignored credentials for Label Studio + MinIO |
+| `.env` | Git-ignored credentials for Label Studio + MinIO + MLflow |
 | `.planning/REQUIREMENTS.md` | 15 v1 requirements with REQ-IDs |
 | `.planning/ROADMAP.md` | 3-phase roadmap (all complete) |
 | `.planning/STATE.md` | Milestone status and deferred v2 items |

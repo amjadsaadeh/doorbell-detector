@@ -48,7 +48,7 @@ The pipeline (`dvc.yaml`) is fully reproducible with DVC and runs end-to-end wit
 3. download only missing audio files from S3 (incremental, pruned)
 4. extract MFCC features
 5. cut into chunks and balance bell vs. background
-6. train an XGBoost classifier, tracked with dvclive
+6. train an XGBoost classifier, tracked with MLflow
 
 # Running It
 
@@ -60,6 +60,9 @@ LABEL_STUDIO_API_KEY=...    # personal access token
 AWS_ENDPOINT_URL=...        # MinIO endpoint
 AWS_ACCESS_KEY_ID=...
 AWS_SECRET_ACCESS_KEY=...
+MLFLOW_TRACKING_URI=...          # MLflow tracking server
+MLFLOW_TRACKING_USERNAME=...
+MLFLOW_TRACKING_PASSWORD=...
 ```
 
 ```bash

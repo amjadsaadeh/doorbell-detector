@@ -1,13 +1,18 @@
-import pandas as pd
-import numpy as np
+import os
 from pathlib import Path
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import classification_report
+
+import matplotlib.pyplot as plt
+import mlflow
+import mlflow.xgboost
+import numpy as np
+import pandas as pd
 import xgboost as xgb
 import yaml
-from dvclive.xgb import DVCLiveCallback
-from dvclive import Live
+from sklearn.metrics import ConfusionMatrixDisplay, classification_report
+from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
+
+MLFLOW_EXPERIMENT_NAME = "doorbell-detector"
 
 
 def prepare_data(df):
@@ -27,7 +32,7 @@ def main():
 
     with open("params.yaml", "r") as file:
         params = yaml.safe_load(file)
-        
+
     model_params = params["model"]
 
     # Load data
@@ -39,11 +44,15 @@ def main():
         X, y, test_size=params["training"]["test_size"], random_state=42, stratify=y
     )
 
-    with Live() as live:
+    mlflow.set_tracking_uri(os.environ["MLFLOW_TRACKING_URI"])
+    mlflow.set_experiment(MLFLOW_EXPERIMENT_NAME)
+    mlflow.xgboost.autolog(log_datasets=False)
+
+    with mlflow.start_run():
+        mlflow.log_param("test_size", params["training"]["test_size"])
+
         # Train model
-        model = xgb.XGBClassifier(
-            objective="binary:logistic", callbacks=[DVCLiveCallback()], **model_params
-        )
+        model = xgb.XGBClassifier(objective="binary:logistic", **model_params)
         model.fit(X_train, y_train, eval_set=[(X_test, y_test)], verbose=True)
 
         # Evaluate and save metrics
@@ -52,15 +61,19 @@ def main():
         y_test_decoded = le.inverse_transform(y_test)
         report = classification_report(y_test, y_pred, output_dict=True)
 
-        live.log_sklearn_plot("confusion_matrix", y_test_decoded, y_pred_decoded)
-        live.log_metric("f1_score", report["weighted avg"]["f1-score"])
-        live.log_metric("recall", report["weighted avg"]["recall"])
-        live.log_metric("precision", report["weighted avg"]["precision"])
+        mlflow.log_metric("f1_score", report["weighted avg"]["f1-score"])
+        mlflow.log_metric("recall", report["weighted avg"]["recall"])
+        mlflow.log_metric("precision", report["weighted avg"]["precision"])
+
+        fig, ax = plt.subplots()
+        ConfusionMatrixDisplay.from_predictions(y_test_decoded, y_pred_decoded, ax=ax)
+        mlflow.log_figure(fig, "confusion_matrix.png")
+        plt.close(fig)
+
         # Save model
         model_path = Path("./models/xgboost_model.json")
         model_path.parent.mkdir(exist_ok=True)
         model.save_model(model_path)
-        live.log_artifact(model_path)
 
 
 if __name__ == "__main__":

@@ -82,22 +82,11 @@ stages:
 metrics:
 - data/data_quality/sample_based_quality.json
 - data/data_quality/chunk_balanced_quality.json
-- dvclive/metrics.json
 plots:
 - number of samples vs label:
     template: bar_horizontal_sorted
     x: '0'
     y:
       data/data_quality/samples_per_label.csv: label
-
-- dvclive/plots/metrics:
-    x: step
-- dvclive/plots/sklearn/confusion_matrix.json:
-    template: confusion
-    x: actual
-    y: predicted
-    title: Confusion Matrix
-    x_label: True Label
-    y_label: Predicted Label
 params:
 - params.yaml

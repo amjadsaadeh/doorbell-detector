@@ -1,0 +1,5 @@
+create a new branch, which replaces the mel Features with Standart Stft spectrogram. keep the chunksize of 2s, If possible use for the spectrogram NOT librosa. keep the Default params for spectrogram Generation. rerun the Pipeline and Report me the results
+
+---
+
+continue

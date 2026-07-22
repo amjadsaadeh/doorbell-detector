@@ -13,11 +13,11 @@ from tqdm import tqdm
 from pandarallel import pandarallel
 
 
-MFCC_FEATURES_FILE_BASE = Path('./data/mfcc_data')
+STFT_FEATURES_FILE_BASE = Path('./data/stft_data')
 AUDIO_FILE_BASE = Path('./data/audio')
 AUGMENTED_AUDIO_FILE_BASE = Path('./data/augmented_audio')
 SAMPLING_RATE = 16000
-HOP_LENGTH = 512  # librosa.feature.mfcc default, must match extract_mfcc_features.py
+HOP_LENGTH = 128  # scipy.signal.stft default (nperseg=256, noverlap=128), must match extract_stft_features.py
 FRAMES_PER_MS = SAMPLING_RATE / HOP_LENGTH / 1000
 
 
@@ -30,23 +30,23 @@ def resolve_audio_path(audio_file_name: str) -> Path:
             return candidate
     raise FileNotFoundError(audio_file_name)
 
-def get_mfcc_features(start: int,  end: int, audio_file_name: str) -> np.ndarray:
-    """Reads out the MFCC features from the file and cut them according to start and end.
+def get_stft_features(start: int,  end: int, audio_file_name: str) -> np.ndarray:
+    """Reads out the STFT features from the file and cut them according to start and end.
 
     Args:
         start (int): start in ms
         end (int): end in ms
-        audio_file_name (str): file to read the mfcc features from
+        audio_file_name (str): file to read the stft features from
 
     Returns:
-        np.ndarray: mfcc features interval according to start and end
+        np.ndarray: stft features interval according to start and end
     """
 
-    mfcc_file_path = MFCC_FEATURES_FILE_BASE / audio_file_name.replace('.wav', '.npy')
-    mfccs = np.load(mfcc_file_path)
+    stft_file_path = STFT_FEATURES_FILE_BASE / audio_file_name.replace('.wav', '.npy')
+    spectrogram = np.load(stft_file_path)
 
-    # Use the fixed sample_rate/hop_length rate librosa used to build the
-    # array, not a per-file average (mfccs.shape[1] / duration): librosa's
+    # Use the fixed sample_rate/hop_length rate scipy used to build the
+    # array, not a per-file average (spectrogram.shape[1] / duration): the
     # frame count has a constant +1 offset, which is negligible for long
     # real files (avg rate ~= true rate) but dominant for exactly
     # chunk_size-long augmented clips (avg rate skews high), so per-file
@@ -55,7 +55,7 @@ def get_mfcc_features(start: int,  end: int, audio_file_name: str) -> np.ndarray
     chunk_size = int(FRAMES_PER_MS * (end - start))
     end_sample = start_sample + chunk_size # This way the shape of the slice it more reliably the same every time
 
-    res = mfccs[:, start_sample:end_sample]
+    res = spectrogram[:, start_sample:end_sample]
 
     return res
 
@@ -114,11 +114,9 @@ if __name__ == "__main__":
     # Shuffle the dataset
     balanced_df = balanced_df.sample(frac=1, random_state=42).reset_index(drop=True)
 
-    sample_rate = 16000
-    n_fft = params["feature_extraction"]["n_fft"]
-    # Add MFCC features column
-    balanced_df['mfcc_features'] = balanced_df.parallel_apply(
-        lambda row: get_mfcc_features(
+    # Add STFT features column
+    balanced_df['stft_features'] = balanced_df.parallel_apply(
+        lambda row: get_stft_features(
             row['chunk_start'],
             row['chunk_end'],
             row['audio_file_name'],

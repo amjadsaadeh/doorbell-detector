@@ -59,8 +59,8 @@ def compute_metrics(y_true, y_pred, prefix):
 
 
 def prepare_data(df):
-    # Convert MFCC features to 1D arrays
-    X = np.vstack([x.flatten() for x in df["mfcc_features"]])
+    # Convert STFT features to 1D arrays
+    X = np.vstack([x.flatten() for x in df["stft_features"]])
     # Convert labels to binary (background=0, non-background=1)
     le = LabelEncoder()
     # Convert to inary problem

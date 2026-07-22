@@ -44,15 +44,13 @@ stages:
     - data/augmented_annotations.csv
 
   extract_features:
-    cmd: python src/extract_mfcc_features.py
+    cmd: python src/extract_stft_features.py
     deps:
     - data/audio
     - data/augmented_audio
-    - src/extract_mfcc_features.py
-    params:
-    - feature_extraction
+    - src/extract_stft_features.py
     outs:
-    - data/mfcc_data/
+    - data/stft_data/
 
   draw_data:
     cmd: python src/draw_data.py
@@ -63,7 +61,7 @@ stages:
     deps:
     - data/annotation_per_row_data.csv
     - data/augmented_annotations.csv
-    - data/mfcc_data/
+    - data/stft_data/
     - src/draw_data.py
     outs:
     - data/balanced_data.h5

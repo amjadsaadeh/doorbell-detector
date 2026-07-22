@@ -1,10 +1,8 @@
-import pandas as pd
 from pathlib import Path
 import numpy as np
-import librosa
+from scipy.signal import stft
 from pydub import AudioSegment
 from pydub.utils import mediainfo
-import yaml
 import tqdm
 import functools
 from multiprocessing import Pool
@@ -14,38 +12,29 @@ AUDIO_DATA_PATH = Path("./data/audio")
 AUGMENTED_AUDIO_DATA_PATH = Path("./data/augmented_audio")
 
 
-def extract_mfcc_features(
-    file_path: Path | str,
-    n_mfcc: int = 25,
-    n_fft=2048,
-) -> np.ndarray:
-    # Extract MFCC features
+def extract_stft_features(file_path: Path | str) -> np.ndarray:
+    # Extract STFT magnitude spectrogram with scipy defaults
+    # (hann window, nperseg=256, noverlap=128 -> hop of 128 samples)
     audio = AudioSegment.from_wav(file_path)
     info = mediainfo(file_path)
     # downmix to mono; stereo files would double the samples (interleaved)
     # and break the frames-per-second assumption in draw_data.py
     audio = audio.set_channels(1)
     audio_segment = np.array(audio.get_array_of_samples(), dtype=np.float32)
-    mfccs = librosa.feature.mfcc(
-        y=audio_segment, sr=int(info["sample_rate"]), n_mfcc=n_mfcc, n_fft=n_fft
-    )
+    _, _, zxx = stft(audio_segment, fs=int(info["sample_rate"]))
 
-    return mfccs
+    return np.abs(zxx)
 
-    
-def process_single_file(audio_file, output_path, params):
-    mfccs = extract_mfcc_features(
-        audio_file,
-        params["feature_extraction"]["n_mfcc"],
-        params["feature_extraction"]["n_fft"]
-    )
-    # Save MFCC features with same name but .npy extension
+
+def process_single_file(audio_file, output_path):
+    spectrogram = extract_stft_features(audio_file)
+    # Save STFT features with same name but .npy extension
     output_file = output_path / (audio_file.stem + '.npy')
-    np.save(output_file, mfccs)
+    np.save(output_file, spectrogram)
 
 
 def process_audio_data(
-    params, input_path: Path, output_path: Path, audio_base_path: Path = AUDIO_DATA_PATH
+    input_path: Path, output_path: Path, audio_base_path: Path = AUDIO_DATA_PATH
 ):
     audio_data = input_path.glob("*.wav")
 
@@ -56,7 +45,7 @@ def process_audio_data(
     output_path.mkdir(parents=True, exist_ok=True)
 
     process_single_file_partial = functools.partial(
-        process_single_file, output_path=output_path, params=params
+        process_single_file, output_path=output_path
     )
 
     # Use multiprocessing with tqdm progress bar
@@ -64,18 +53,15 @@ def process_audio_data(
         list(tqdm.tqdm(
             pool.imap(process_single_file_partial, audio_files),
             total=len(audio_files),
-            desc="Extracting MFCC features"
+            desc="Extracting STFT features"
         ))
 
 if __name__ == "__main__":
-    with open("params.yaml", "r") as file:
-        params = yaml.safe_load(file)
-
     process_audio_data(
-        params, AUDIO_DATA_PATH, Path("./data/mfcc_data")
+        AUDIO_DATA_PATH, Path("./data/stft_data")
     )
     # Augmented (mixed) chunks land in the same output dir; filenames are
     # unique across both sources so there's no collision.
     process_audio_data(
-        params, AUGMENTED_AUDIO_DATA_PATH, Path("./data/mfcc_data")
+        AUGMENTED_AUDIO_DATA_PATH, Path("./data/stft_data")
     )

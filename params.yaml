@@ -10,10 +10,6 @@ augmentation:
   # How many random noise chunks to pair with each real doorbell chunk, per SNR
   pairs_per_signal_chunk: 1
 
-feature_extraction:
-  n_mfcc: 13
-  n_fft: 512
-
 training:
   test_size: 0.2
 

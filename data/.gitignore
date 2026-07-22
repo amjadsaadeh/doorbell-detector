@@ -9,3 +9,4 @@
 /mfcc_data
 /augmented_audio
 /augmented_annotations.csv
+/stft_data

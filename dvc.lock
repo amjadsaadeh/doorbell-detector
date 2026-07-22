@@ -104,7 +104,7 @@ stages:
       md5: 7f431ecef78783885462ab82a0a0c919
       size: 474938
   extract_features:
-    cmd: python src/extract_mfcc_features.py
+    cmd: python src/extract_stft_features.py
     deps:
     - path: data/audio
       hash: md5
@@ -116,28 +116,23 @@ stages:
       md5: 4b2dcbee9dea2c79e4e8ffdef2b778e7.dir
       size: 18892980
       nfiles: 295
-    - path: src/extract_mfcc_features.py
+    - path: src/extract_stft_features.py
       hash: md5
-      md5: 46b9dd2dd0448d0c9434360896a3918b
-      size: 2451
-    params:
-      params.yaml:
-        feature_extraction:
-          n_mfcc: 13
-          n_fft: 512
+      md5: ea6ba7004887e246f20f16c2d658f3d4
+      size: 2211
     outs:
-    - path: data/mfcc_data/
+    - path: data/stft_data/
       hash: md5
-      md5: f4a86669b38664176cf2bf814c1c748a.dir
-      size: 1747860
+      md5: e605cd483c0b94f0872f5bdaf3894487.dir
+      size: 67458140
       nfiles: 346
   train_model:
     cmd: python src/train_xgboost.py
     deps:
     - path: data/balanced_data.h5
       hash: md5
-      md5: 685bddedd954434b47abd5eb3e65cd35
-      size: 3437544
+      md5: d1cd3e20ca679d71dc33b0aa12e63261
+      size: 92493008
     - path: data/data_quality/chunk_balanced_quality.json
       hash: md5
       md5: 8894187097739e6cc9502329ff6271f5
@@ -156,7 +151,7 @@ stages:
       size: 55
     - path: src/train_xgboost.py
       hash: md5
-      md5: 70cc174ed2e6314981254ed6eaf315a4
+      md5: 3fd7ff8fd7f178313c89b84fb171c498
       size: 4420
     params:
       params.yaml:
@@ -173,8 +168,8 @@ stages:
     outs:
     - path: models/xgboost_model.json
       hash: md5
-      md5: a0abb8800f13bf2666b4ec4597503ada
-      size: 28957
+      md5: c4be634f2f64c66b87918f04c488213a
+      size: 32150
   draw_data:
     cmd: python src/draw_data.py
     deps:
@@ -186,15 +181,15 @@ stages:
       hash: md5
       md5: 845166458f965b4d5124768d30b69a7b
       size: 22467
-    - path: data/mfcc_data/
+    - path: data/stft_data/
       hash: md5
-      md5: f4a86669b38664176cf2bf814c1c748a.dir
-      size: 1747860
+      md5: e605cd483c0b94f0872f5bdaf3894487.dir
+      size: 67458140
       nfiles: 346
     - path: src/draw_data.py
       hash: md5
-      md5: 23f536df29e5a682d4b3b6e02a1b2ea4
-      size: 5331
+      md5: f3f8206cf646ff144382760a41f5986f
+      size: 5292
     params:
       params.yaml:
         chunk_overlap: 250
@@ -203,8 +198,8 @@ stages:
     outs:
     - path: data/balanced_data.h5
       hash: md5
-      md5: 685bddedd954434b47abd5eb3e65cd35
-      size: 3437544
+      md5: d1cd3e20ca679d71dc33b0aa12e63261
+      size: 92493008
     - path: data/data_quality/chunk_balanced_quality.json
       hash: md5
       md5: 8894187097739e6cc9502329ff6271f5

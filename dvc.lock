@@ -151,8 +151,8 @@ stages:
       size: 55
     - path: src/train_xgboost.py
       hash: md5
-      md5: c83e873341a539c400e7b4d82a15c182
-      size: 5420
+      md5: 2af970a02427a5939eacafe96172b24c
+      size: 6647
     params:
       params.yaml:
         model:

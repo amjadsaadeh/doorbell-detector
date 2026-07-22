@@ -1,0 +1,85 @@
+{
+  "cli_version": "0.8.42",
+  "checkpoint_id": "5e6da648a7fc",
+  "session_id": "9aa0343f-7308-4e65-a069-4e5d0e94b2cf",
+  "strategy": "manual-commit",
+  "created_at": "2026-07-22T11:49:00.332041428Z",
+  "branch": "main",
+  "checkpoints_count": 2,
+  "files_touched": [
+    "docs/superpowers/specs/2026-07-22-two-stage-audio-streaming-design.md"
+  ],
+  "agent": "Claude Code",
+  "model": "",
+  "turn_id": "3806ef2765b9",
+  "compact_transcript_start": 0,
+  "token_usage": {
+    "input_tokens": 26,
+    "cache_creation_tokens": 114158,
+    "cache_read_tokens": 430777,
+    "output_tokens": 13409,
+    "api_call_count": 13
+  },
+  "skill_events_version": 1,
+  "skill_events": [
+    {
+      "id": "claude-skill-toolu_014664WkH15HuPS38N1TfCX8",
+      "event_type": "tool_invocation",
+      "skill": {
+        "name": "superpowers:brainstorming"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "skill_tool_use",
+        "confidence": "explicit"
+      },
+      "turn_id": "3806ef2765b9",
+      "transcript_anchor": {
+        "unit": "line",
+        "start": 54,
+        "end": 55,
+        "entry_ids": [
+          "cbd34007-dc56-469a-a332-bb2329430501"
+        ],
+        "tool_use_id": "toolu_014664WkH15HuPS38N1TfCX8"
+      },
+      "native": {
+        "tool_name": "Skill",
+        "tool_use_id": "toolu_014664WkH15HuPS38N1TfCX8"
+      },
+      "collapse": {
+        "target": "tool_pair",
+        "label": "Skill: superpowers:brainstorming",
+        "default_collapsed": true
+      }
+    }
+  ],
+  "session_metrics": {
+    "turn_count": 2
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-07-22T11:49:00.307168542Z",
+    "agent_lines": 117,
+    "agent_removed": 0,
+    "human_added": 0,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 117,
+    "total_lines_changed": 117,
+    "agent_percentage": 100,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 21,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        ".claude/scheduled_tasks.lock": 1,
+        ".claude/settings.local.json": 20
+      }
+    }
+  ]
+}

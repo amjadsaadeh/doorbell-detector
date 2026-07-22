@@ -1,0 +1,13 @@
+checkimi
+
+---
+
+checkout the repo. what might be a good jext steo
+
+---
+
+Sketch a plan to Stream audio from the Pi Zero w to another Host with more power
+
+---
+
+pit this plan into an md File for later execution

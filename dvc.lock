@@ -113,9 +113,9 @@ stages:
       nfiles: 51
     - path: data/augmented_audio
       hash: md5
-      md5: 4b2dcbee9dea2c79e4e8ffdef2b778e7.dir
-      size: 18892980
-      nfiles: 295
+      md5: 77b7fbda7099c07ab97efa020bb689f4.dir
+      size: 37785960
+      nfiles: 590
     - path: src/extract_stft_features.py
       hash: md5
       md5: ea6ba7004887e246f20f16c2d658f3d4
@@ -123,23 +123,23 @@ stages:
     outs:
     - path: data/stft_data/
       hash: md5
-      md5: e605cd483c0b94f0872f5bdaf3894487.dir
-      size: 67458140
-      nfiles: 346
+      md5: 32ed3ec406f446ee89f5bdd92aad969d.dir
+      size: 105703120
+      nfiles: 641
   train_model:
     cmd: python src/train_xgboost.py
     deps:
     - path: data/balanced_data.h5
       hash: md5
-      md5: d1cd3e20ca679d71dc33b0aa12e63261
-      size: 92493008
+      md5: 6b4f69cff9101a5b500a1c40dd660a92
+      size: 168692016
     - path: data/data_quality/chunk_balanced_quality.json
       hash: md5
-      md5: 8894187097739e6cc9502329ff6271f5
-      size: 103
+      md5: 698fc7223476909324db7214f0050491
+      size: 104
     - path: data/data_quality/chunks_per_label.csv
       hash: md5
-      md5: 1e1a366031428c893412b7d15d8fe314
+      md5: dd331473138c91c8ebe986ef2dbe6e07
       size: 42
     - path: data/data_quality/sample_based_quality.json
       hash: md5
@@ -151,8 +151,8 @@ stages:
       size: 55
     - path: src/train_xgboost.py
       hash: md5
-      md5: 3fd7ff8fd7f178313c89b84fb171c498
-      size: 4420
+      md5: c83e873341a539c400e7b4d82a15c182
+      size: 5420
     params:
       params.yaml:
         model:
@@ -168,8 +168,8 @@ stages:
     outs:
     - path: models/xgboost_model.json
       hash: md5
-      md5: c4be634f2f64c66b87918f04c488213a
-      size: 32150
+      md5: 775ec597b5a7b2d6695102f5602983a2
+      size: 47745
   draw_data:
     cmd: python src/draw_data.py
     deps:
@@ -179,17 +179,17 @@ stages:
       size: 6187
     - path: data/augmented_annotations.csv
       hash: md5
-      md5: 845166458f965b4d5124768d30b69a7b
-      size: 22467
+      md5: 5d2f46931f4a334c3c0f6a771da550d4
+      size: 63847
     - path: data/stft_data/
       hash: md5
-      md5: e605cd483c0b94f0872f5bdaf3894487.dir
-      size: 67458140
-      nfiles: 346
+      md5: 32ed3ec406f446ee89f5bdd92aad969d.dir
+      size: 105703120
+      nfiles: 641
     - path: src/draw_data.py
       hash: md5
-      md5: f3f8206cf646ff144382760a41f5986f
-      size: 5292
+      md5: b5e5ba8dc670fabc8c718a90f2097939
+      size: 5720
     params:
       params.yaml:
         chunk_overlap: 250
@@ -198,15 +198,15 @@ stages:
     outs:
     - path: data/balanced_data.h5
       hash: md5
-      md5: d1cd3e20ca679d71dc33b0aa12e63261
-      size: 92493008
+      md5: 6b4f69cff9101a5b500a1c40dd660a92
+      size: 168692016
     - path: data/data_quality/chunk_balanced_quality.json
       hash: md5
-      md5: 8894187097739e6cc9502329ff6271f5
-      size: 103
+      md5: 698fc7223476909324db7214f0050491
+      size: 104
     - path: data/data_quality/chunks_per_label.csv
       hash: md5
-      md5: 1e1a366031428c893412b7d15d8fe314
+      md5: dd331473138c91c8ebe986ef2dbe6e07
       size: 42
   augmentation:
     cmd: python src/augment_data.py
@@ -222,8 +222,8 @@ stages:
       nfiles: 51
     - path: src/augment_data.py
       hash: md5
-      md5: fe1a706fadb260c686b68a6508e5f34b
-      size: 5420
+      md5: b9470a955a166a3e8fcee10d801dd343
+      size: 6620
     params:
       params.yaml:
         augmentation:
@@ -233,16 +233,17 @@ stages:
           - 5
           - 10
           - 15
-          pairs_per_signal_chunk: 1
+          pairs_per_signal_chunk: 2
+          gain_jitter_db: 6
         chunk_overlap: 250
         chunk_size: 2000
     outs:
     - path: data/augmented_annotations.csv
       hash: md5
-      md5: 845166458f965b4d5124768d30b69a7b
-      size: 22467
+      md5: 5d2f46931f4a334c3c0f6a771da550d4
+      size: 63847
     - path: data/augmented_audio
       hash: md5
-      md5: 4b2dcbee9dea2c79e4e8ffdef2b778e7.dir
-      size: 18892980
-      nfiles: 295
+      md5: 77b7fbda7099c07ab97efa020bb689f4.dir
+      size: 37785960
+      nfiles: 590

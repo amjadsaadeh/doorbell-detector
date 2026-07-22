@@ -8,7 +8,10 @@ augmentation:
   # to clearly audible (+15dB) to cover realistic in-the-wild conditions.
   snrs_db: [-5, 0, 5, 10, 15]
   # How many random noise chunks to pair with each real doorbell chunk, per SNR
-  pairs_per_signal_chunk: 1
+  pairs_per_signal_chunk: 2
+  # Uniform loudness jitter (+/- dB) applied to each mixed sample so synthetic
+  # positives vary in absolute level, not just SNR
+  gain_jitter_db: 6
 
 training:
   test_size: 0.2

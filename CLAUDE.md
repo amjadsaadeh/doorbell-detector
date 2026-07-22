@@ -47,7 +47,11 @@ to train an XGBoost bell classifier.
 - **Augmentation (`augment_data.py`):** grows the minority `front_doorbell` class by
   mixing real doorbell chunks (signal) with real background chunks (noise) via simple
   addition at each `augmentation.snrs_db` target SNR (`params.yaml`; `flat_doorbell` is
-  excluded — too little raw data to seed it). Output rows carry `end = (chunk_size +
+  excluded — too little raw data to seed it). Each signal chunk is paired with
+  `pairs_per_signal_chunk` random noise chunks per SNR; the noise is circularly
+  time-shifted and each mix gets ±`gain_jitter_db` uniform loudness jitter. Rows carry
+  `split_group` = source file of the signal chunk (leakage guard, see training note
+  below). Output rows carry `end = (chunk_size +
   1) / 1000`, 1ms past the real chunk length; this is a deliberate metadata trick so
   `draw_data.py`'s sliding-window loop emits exactly one `chunk_start=0` window per
   augmented file, reusing the real-annotation chunking path unmodified.
@@ -57,6 +61,12 @@ to train an XGBoost bell classifier.
   files (always rounded to the same width) but dominant for exactly `chunk_size`-long
   augmented clips (rounded to a different width), which broke `np.vstack` in
   `train_xgboost.py` once augmented and real chunks were trained together.
+- **Train/val split is group-aware** (`train_xgboost.py`): `StratifiedGroupKFold`
+  grouped by `split_group` (source recording; augmented rows inherit their signal
+  chunk's source file). A plain random chunk split leaks near-duplicate overlapping
+  windows and SNR variants across the split and inflates validation metrics.
+  `training.test_size` maps to the fold fraction (1/n_splits); the realized fraction
+  is logged to MLflow as `realized_test_fraction`.
 
 ## GSD Workflow
 

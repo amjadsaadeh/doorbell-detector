@@ -74,6 +74,14 @@ if __name__ == "__main__":
     augmented_data = pd.read_csv("./data/augmented_annotations.csv")
     annotated_data = pd.concat([annotated_data, augmented_data], ignore_index=True)
 
+    # Group key for leakage-safe train/val splitting downstream: augmented rows
+    # already carry the source file of their signal chunk; real rows (no
+    # split_group column in their CSV) group by their own file. Overlapping
+    # sliding windows and SNR variants of one recording thus share a group.
+    annotated_data["split_group"] = annotated_data["split_group"].fillna(
+        annotated_data["audio_file_name"]
+    )
+
     # Preload duration, so we don't have to read the file for each chunk
     annotated_data["audio_file_duration"] = annotated_data["audio_file_name"].parallel_apply(lambda x: mediainfo(resolve_audio_path(x))["duration"])
 

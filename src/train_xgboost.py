@@ -10,7 +10,7 @@ import pandas as pd
 import xgboost as xgb
 import yaml
 from sklearn.metrics import ConfusionMatrixDisplay, classification_report
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import StratifiedGroupKFold
 from sklearn.preprocessing import LabelEncoder
 
 MLFLOW_EXPERIMENT_NAME = "doorbell-detector"
@@ -82,10 +82,18 @@ def main():
     df = pd.read_hdf("./data/balanced_data.h5", key="data")
     X, y, le = prepare_data(df)
 
-    # Split data
-    X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=params["training"]["test_size"], random_state=42, stratify=y
-    )
+    # Group-aware split: chunks are cut from sliding windows with heavy
+    # overlap, and augmented samples are SNR/gain variants of real chunks —
+    # a random chunk-level split leaks near-duplicates between train and
+    # test. Grouping by split_group (source recording) keeps every window
+    # and synthetic variant of one recording on the same side. test_size
+    # becomes the fold fraction (1/n_splits), stratified at group level.
+    groups = df["split_group"].to_numpy()
+    n_splits = max(2, round(1 / params["training"]["test_size"]))
+    splitter = StratifiedGroupKFold(n_splits=n_splits, shuffle=True, random_state=42)
+    train_idx, test_idx = next(splitter.split(X, y, groups))
+    X_train, X_test = X[train_idx], X[test_idx]
+    y_train, y_test = y[train_idx], y[test_idx]
 
     mlflow.set_tracking_uri(os.environ["MLFLOW_TRACKING_URI"])
     mlflow.set_experiment(MLFLOW_EXPERIMENT_NAME)
@@ -93,6 +101,12 @@ def main():
 
     with mlflow.start_run():
         mlflow.log_param("test_size", params["training"]["test_size"])
+        mlflow.log_param(
+            "split_strategy", f"StratifiedGroupKFold by split_group, 1/{n_splits} test fold"
+        )
+        # Group sizes vary, so the realized fold fraction can deviate from
+        # the nominal test_size — log it for honest comparison across runs.
+        mlflow.log_param("realized_test_fraction", round(len(test_idx) / len(y), 4))
         # eval_set order below drives XGBoost's auto-generated eval names,
         # which is what the per-round loss curve in MLflow gets logged under.
         mlflow.log_param("eval_set_names", "validation_0=train, validation_1=test")

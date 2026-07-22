@@ -1,0 +1,26 @@
+{
+  "cli_version": "0.8.42",
+  "checkpoint_id": "3e16d685b802",
+  "strategy": "manual-commit",
+  "branch": "stft-spectrogram-features",
+  "checkpoints_count": 2,
+  "files_touched": [
+    "dvc.lock"
+  ],
+  "sessions": [
+    {
+      "metadata": "/3e/16d685b802/0/metadata.json",
+      "transcript": "/3e/16d685b802/0/full.jsonl",
+      "compact_transcript": "/3e/16d685b802/0/transcript.jsonl",
+      "content_hash": "/3e/16d685b802/0/content_hash.txt",
+      "prompt": ""
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 6,
+    "cache_creation_tokens": 2443,
+    "cache_read_tokens": 254654,
+    "output_tokens": 859,
+    "api_call_count": 3
+  }
+}

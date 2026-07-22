@@ -1,5 +1,0 @@
-commit and push in git and in dvc
-
----
-
-is the Data also tracable in mlflow? May IT be possible to gice the Experiments bettee Naming? maybe a Mix with the branch, the model Name and Feature Type Name?

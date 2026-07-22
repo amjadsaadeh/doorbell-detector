@@ -2,10 +2,9 @@
   "cli_version": "0.8.42",
   "checkpoint_id": "6bdc26dac8e2",
   "strategy": "manual-commit",
-  "branch": "main",
+  "branch": "stft-spectrogram-features",
   "checkpoints_count": 2,
   "files_touched": [
-    "CLAUDE.md",
     "src/train_xgboost.py"
   ],
   "sessions": [
@@ -14,14 +13,14 @@
       "transcript": "/6b/dc26dac8e2/0/full.jsonl",
       "compact_transcript": "/6b/dc26dac8e2/0/transcript.jsonl",
       "content_hash": "/6b/dc26dac8e2/0/content_hash.txt",
-      "prompt": "/6b/dc26dac8e2/0/prompt.txt"
+      "prompt": ""
     }
   ],
   "token_usage": {
-    "input_tokens": 16,
-    "cache_creation_tokens": 8212,
-    "cache_read_tokens": 843631,
-    "output_tokens": 6709,
-    "api_call_count": 8
+    "input_tokens": 4,
+    "cache_creation_tokens": 8351,
+    "cache_read_tokens": 230821,
+    "output_tokens": 801,
+    "api_call_count": 2
   }
 }

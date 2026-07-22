@@ -28,6 +28,10 @@ to train an XGBoost bell classifier.
   to MLflow (experiment `doorbell-detector`) at `MLFLOW_TRACKING_URI` — a self-hosted
   server (`https://mlflow.saadeh.dev`), not managed from this repo. `dvc metrics
   show`/`dvc plots diff` no longer cover training metrics; check the MLflow UI instead.
+  Runs are named `xgboost-<feature_type>-<git_branch>` (feature type auto-detected from
+  the `*_features` column in `balanced_data.h5`) and log `balanced_data_md5` — the md5
+  DVC records for the dataset — so every run traces to an exact, `dvc pull`-able
+  dataset version.
 - **Label Studio auth** is a JWT personal access token: `fetch_data.sh` exchanges it
   via `/api/token/refresh` for a Bearer token (legacy `Token` header returns 401).
 - **Incrementality:** `data/audio` is a `persist: true` output — unchanged labels skip

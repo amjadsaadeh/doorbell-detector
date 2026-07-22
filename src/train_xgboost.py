@@ -1,5 +1,7 @@
+import hashlib
 import json
 import os
+import subprocess
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -14,6 +16,8 @@ from sklearn.model_selection import StratifiedGroupKFold
 from sklearn.preprocessing import LabelEncoder
 
 MLFLOW_EXPERIMENT_NAME = "doorbell-detector"
+
+DATA_FILE = Path("./data/balanced_data.h5")
 
 DATA_QUALITY_DIR = Path("./data/data_quality")
 # (json file, metric prefix) pairs produced by extract_data_quality.py (raw,
@@ -58,9 +62,21 @@ def compute_metrics(y_true, y_pred, prefix):
     }
 
 
+def get_git_branch():
+    result = subprocess.run(
+        ["git", "rev-parse", "--abbrev-ref", "HEAD"], capture_output=True, text=True
+    )
+    return result.stdout.strip() or "unknown"
+
+
 def prepare_data(df):
-    # Convert MFCC features to 1D arrays
-    X = np.vstack([x.flatten() for x in df["mfcc_features"]])
+    # The feature column is named after the representation that produced it
+    # (mfcc_features, stft_features, ...) — detect it so this script works
+    # unchanged across feature-extraction variants/branches, and surface the
+    # type for run naming.
+    feature_col = next(c for c in df.columns if c.endswith("_features"))
+    # Convert features to 1D arrays
+    X = np.vstack([x.flatten() for x in df[feature_col]])
     # Convert labels to binary (background=0, non-background=1)
     le = LabelEncoder()
     # Convert to inary problem
@@ -68,7 +84,7 @@ def prepare_data(df):
         lambda x: "background" if x == "background" else "bell"
     )
     y = le.fit_transform(df["label"])
-    return X, y, le
+    return X, y, le, feature_col.removesuffix("_features")
 
 
 def main():
@@ -79,8 +95,8 @@ def main():
     model_params = params["model"]
 
     # Load data
-    df = pd.read_hdf("./data/balanced_data.h5", key="data")
-    X, y, le = prepare_data(df)
+    df = pd.read_hdf(DATA_FILE, key="data")
+    X, y, le, feature_type = prepare_data(df)
 
     # Group-aware split: chunks are cut from sliding windows with heavy
     # overlap, and augmented samples are SNR/gain variants of real chunks —
@@ -99,7 +115,17 @@ def main():
     mlflow.set_experiment(MLFLOW_EXPERIMENT_NAME)
     mlflow.xgboost.autolog(log_datasets=False)
 
-    with mlflow.start_run():
+    git_branch = get_git_branch()
+
+    with mlflow.start_run(run_name=f"xgboost-{feature_type}-{git_branch}"):
+        mlflow.set_tag("git_branch", git_branch)
+        mlflow.log_param("feature_type", feature_type)
+        # Data lineage: md5 of the training dataset matches the entry DVC
+        # records for it in dvc.lock/its cache, so any MLflow run can be
+        # traced back to the exact dataset version and restored via dvc.
+        mlflow.log_param("balanced_data_md5", hashlib.md5(DATA_FILE.read_bytes()).hexdigest())
+        mlflow.log_param("n_chunks", X.shape[0])
+        mlflow.log_param("n_features", X.shape[1])
         mlflow.log_param("test_size", params["training"]["test_size"])
         mlflow.log_param(
             "split_strategy", f"StratifiedGroupKFold by split_group, 1/{n_splits} test fold"

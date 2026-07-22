@@ -31,11 +31,13 @@ def load_mono_samples(audio_file_name: str) -> tuple[np.ndarray, int]:
     return samples, audio.frame_rate
 
 
-def extract_windows(df: pd.DataFrame, chunk_size_ms: int, chunk_overlap_ms: int) -> list[np.ndarray]:
+def extract_windows(df: pd.DataFrame, chunk_size_ms: int, chunk_overlap_ms: int) -> list[tuple[np.ndarray, str]]:
     """Slides a chunk_size_ms window (stepping by chunk_overlap_ms) over every
-    labeled span in df and returns the raw sample arrays. Mirrors the
-    windowing convention in draw_data.py so augmented chunks line up with
-    real ones.
+    labeled span in df and returns (raw sample array, source file name) pairs.
+    Mirrors the windowing convention in draw_data.py so augmented chunks line
+    up with real ones. The source file name becomes the split_group of the
+    mixed sample, so augmented variants never straddle a group-aware
+    train/val split of their source recording.
     """
     windows = []
     for audio_file_name, group in df.groupby("audio_file_name"):
@@ -54,7 +56,7 @@ def extract_windows(df: pd.DataFrame, chunk_size_ms: int, chunk_overlap_ms: int)
                 start_sample = int(samples_per_ms * chunk_start_ms)
                 window = samples[start_sample : start_sample + chunk_len_samples]
                 if len(window) == chunk_len_samples:
-                    windows.append(window)
+                    windows.append((window, audio_file_name))
 
     return windows
 
@@ -89,6 +91,7 @@ if __name__ == "__main__":
     chunk_overlap = params["chunk_overlap"]
     snrs_db = params["augmentation"]["snrs_db"]
     pairs_per_signal_chunk = params["augmentation"]["pairs_per_signal_chunk"]
+    gain_jitter_db = params["augmentation"]["gain_jitter_db"]
 
     annotated_data = pd.read_csv("./data/annotation_per_row_data.csv")
 
@@ -107,12 +110,23 @@ if __name__ == "__main__":
     rows = []
 
     for snr_db in snrs_db:
-        for signal_idx, signal in enumerate(
+        for signal_idx, (signal, signal_source) in enumerate(
             tqdm(signal_windows, desc=f"Mixing at {snr_db}dB SNR")
         ):
             for pair_idx in range(pairs_per_signal_chunk):
-                noise = rng.choice(noise_windows)
+                noise, _ = rng.choice(noise_windows)
+                # Circularly shift the noise so repeated draws of the same
+                # background chunk don't always align identically with the bell
+                noise = np.roll(noise, rng.randrange(len(noise)))
                 mixed = mix_at_snr(signal, noise, snr_db)
+                # Loudness jitter: vary absolute level (SNR is unaffected since
+                # both terms scale equally) so synthetic positives don't all sit
+                # at the source recording's gain
+                gain_db = rng.uniform(-gain_jitter_db, gain_jitter_db)
+                mixed = mixed * (10 ** (gain_db / 20))
+                peak = np.max(np.abs(mixed))
+                if peak > 32767:
+                    mixed = mixed * (32767 / peak)
 
                 sample_id = f"aug_snr{snr_db}_{signal_idx}_{pair_idx}"
                 file_name = f"{sample_id}.wav"
@@ -138,6 +152,9 @@ if __name__ == "__main__":
                         "audio_file_name": file_name,
                         "remote_audio_path": "",
                         "snr_db": snr_db,
+                        # Leakage guard for group-aware splitting: augmented
+                        # samples belong to the recording their signal came from
+                        "split_group": signal_source,
                     }
                 )
 

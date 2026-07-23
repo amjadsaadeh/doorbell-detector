@@ -1,0 +1,75 @@
+{
+  "cli_version": "0.8.42",
+  "checkpoint_id": "989e5b02cbe1",
+  "session_id": "9c2c48ab-5b18-47ee-8ad9-f8f6c89acf3a",
+  "strategy": "manual-commit",
+  "created_at": "2026-07-23T17:11:31.179895065Z",
+  "branch": "cnn-spectrogram",
+  "checkpoints_count": 3,
+  "files_touched": [
+    "params.yaml",
+    "dvc.yaml"
+  ],
+  "agent": "Claude Code",
+  "model": "",
+  "turn_id": "4c2fb7e39d35",
+  "checkpoint_transcript_start": 319,
+  "transcript_lines_at_start": 319,
+  "compact_transcript_start": 70,
+  "token_usage": {
+    "input_tokens": 18,
+    "cache_creation_tokens": 7066,
+    "cache_read_tokens": 1317646,
+    "output_tokens": 3460,
+    "api_call_count": 9
+  },
+  "skill_events_version": 1,
+  "skill_events": [
+    {
+      "id": "claude-skill-toolu_01NUC6M9QY2fMSDnuxgeg393",
+      "event_type": "tool_invocation",
+      "skill": {
+        "name": "superpowers:brainstorming"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "skill_tool_use",
+        "confidence": "explicit"
+      },
+      "turn_id": "4c2fb7e39d35",
+      "transcript_anchor": {
+        "unit": "line",
+        "start": 25,
+        "end": 26,
+        "entry_ids": [
+          "fe0e5e3d-3dcf-4e86-bb65-aaf39162c016"
+        ],
+        "tool_use_id": "toolu_01NUC6M9QY2fMSDnuxgeg393"
+      },
+      "native": {
+        "tool_name": "Skill",
+        "tool_use_id": "toolu_01NUC6M9QY2fMSDnuxgeg393"
+      },
+      "collapse": {
+        "target": "tool_pair",
+        "label": "Skill: superpowers:brainstorming",
+        "default_collapsed": true
+      }
+    }
+  ],
+  "session_metrics": {
+    "turn_count": 4
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-07-23T17:11:31.102839734Z",
+    "agent_lines": 7,
+    "agent_removed": 12,
+    "human_added": 645,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 652,
+    "total_lines_changed": 683,
+    "agent_percentage": 2.781844802342606,
+    "metric_version": 2
+  }
+}

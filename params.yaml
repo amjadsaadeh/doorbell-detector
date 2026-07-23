@@ -44,8 +44,12 @@ training:
   test_size: 0.2
 
 model:
-  n_estimators: 25
-  max_depth: 6
-  learning_rate: 0.1
+  learning_rate: 0.001
+  batch_size: 32
+  epochs: 100
+  early_stopping_patience: 10
+  dropout: 0.3
+  # MFCCs are already log-domain; raw STFT magnitudes are not (see
+  # train_cnn.py) — flip this on the spectrogram branch
+  log_compress: false
   random_state: 42
-  eval_metric: ["logloss", "error"]

@@ -1,1 +1,3 @@
 /xgboost_model.json
+/cnn_model.keras
+/cnn_normalization.npz

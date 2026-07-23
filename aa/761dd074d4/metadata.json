@@ -1,0 +1,30 @@
+{
+  "cli_version": "0.8.42",
+  "checkpoint_id": "aa761dd074d4",
+  "strategy": "manual-commit",
+  "branch": "yamnet-features",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "dvc.yaml",
+    "src/draw_data.py",
+    "src/extract_yamnet_features.py",
+    "tests/draw_data_test.py",
+    "tests/feature_extraction_test.py"
+  ],
+  "sessions": [
+    {
+      "metadata": "/aa/761dd074d4/0/metadata.json",
+      "transcript": "/aa/761dd074d4/0/full.jsonl",
+      "compact_transcript": "/aa/761dd074d4/0/transcript.jsonl",
+      "content_hash": "/aa/761dd074d4/0/content_hash.txt",
+      "prompt": ""
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 48,
+    "cache_creation_tokens": 33137,
+    "cache_read_tokens": 2134742,
+    "output_tokens": 12340,
+    "api_call_count": 24
+  }
+}

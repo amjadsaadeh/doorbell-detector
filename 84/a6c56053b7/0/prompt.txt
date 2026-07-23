@@ -1,0 +1,9 @@
+commit and push with dvc and git
+
+---
+
+give me a comparison table of the Performance of all Implementation s at the moment
+
+---
+
+ok now create 2 branches for proposal 1: one with spectrogram and one with mfcc features

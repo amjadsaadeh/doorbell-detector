@@ -1,0 +1,29 @@
+{
+  "cli_version": "0.8.42",
+  "checkpoint_id": "84a6c56053b7",
+  "strategy": "manual-commit",
+  "branch": "cnn-mfcc",
+  "checkpoints_count": 3,
+  "files_touched": [
+    "dvc.yaml",
+    "params.yaml",
+    "src/train_cnn.py",
+    "tests/train_cnn_test.py"
+  ],
+  "sessions": [
+    {
+      "metadata": "/84/a6c56053b7/0/metadata.json",
+      "transcript": "/84/a6c56053b7/0/full.jsonl",
+      "compact_transcript": "/84/a6c56053b7/0/transcript.jsonl",
+      "content_hash": "/84/a6c56053b7/0/content_hash.txt",
+      "prompt": "/84/a6c56053b7/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 30,
+    "cache_creation_tokens": 145105,
+    "cache_read_tokens": 1770911,
+    "output_tokens": 16984,
+    "api_call_count": 15
+  }
+}

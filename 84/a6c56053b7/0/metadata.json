@@ -1,0 +1,90 @@
+{
+  "cli_version": "0.8.42",
+  "checkpoint_id": "84a6c56053b7",
+  "session_id": "9c2c48ab-5b18-47ee-8ad9-f8f6c89acf3a",
+  "strategy": "manual-commit",
+  "created_at": "2026-07-23T16:55:08.970793858Z",
+  "branch": "cnn-mfcc",
+  "checkpoints_count": 3,
+  "files_touched": [
+    "src/train_cnn.py",
+    "tests/train_cnn_test.py",
+    "params.yaml",
+    "dvc.yaml"
+  ],
+  "agent": "Claude Code",
+  "model": "",
+  "turn_id": "4c2fb7e39d35",
+  "checkpoint_transcript_start": 213,
+  "transcript_lines_at_start": 213,
+  "compact_transcript_start": 50,
+  "token_usage": {
+    "input_tokens": 30,
+    "cache_creation_tokens": 145105,
+    "cache_read_tokens": 1770911,
+    "output_tokens": 16984,
+    "api_call_count": 15
+  },
+  "skill_events_version": 1,
+  "skill_events": [
+    {
+      "id": "claude-skill-toolu_01NUC6M9QY2fMSDnuxgeg393",
+      "event_type": "tool_invocation",
+      "skill": {
+        "name": "superpowers:brainstorming"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "skill_tool_use",
+        "confidence": "explicit"
+      },
+      "turn_id": "4c2fb7e39d35",
+      "transcript_anchor": {
+        "unit": "line",
+        "start": 25,
+        "end": 26,
+        "entry_ids": [
+          "fe0e5e3d-3dcf-4e86-bb65-aaf39162c016"
+        ],
+        "tool_use_id": "toolu_01NUC6M9QY2fMSDnuxgeg393"
+      },
+      "native": {
+        "tool_name": "Skill",
+        "tool_use_id": "toolu_01NUC6M9QY2fMSDnuxgeg393"
+      },
+      "collapse": {
+        "target": "tool_pair",
+        "label": "Skill: superpowers:brainstorming",
+        "default_collapsed": true
+      }
+    }
+  ],
+  "session_metrics": {
+    "turn_count": 4
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-07-23T16:55:08.893436964Z",
+    "agent_lines": 261,
+    "agent_removed": 10,
+    "human_added": 401,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 662,
+    "total_lines_changed": 691,
+    "agent_percentage": 39.218523878437054,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 21,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        ".claude/scheduled_tasks.lock": 1,
+        ".claude/settings.local.json": 20
+      }
+    }
+  ]
+}

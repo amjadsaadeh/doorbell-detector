@@ -3,6 +3,21 @@ from pathlib import Path
 import pandas as pd
 import numpy as np
 from src.extract_mfcc_features import process_audio_data, extract_mfcc_features
+from src.extract_yamnet_features import MIN_SAMPLES, ensure_min_length
+
+
+class TestEnsureMinLength(unittest.TestCase):
+
+    def test_short_waveform_is_zero_padded(self):
+        waveform = np.ones(100, dtype=np.float32)
+        padded = ensure_min_length(waveform)
+        self.assertEqual(len(padded), MIN_SAMPLES)
+        np.testing.assert_array_equal(padded[:100], waveform)
+        self.assertEqual(padded[100:].sum(), 0)
+
+    def test_long_waveform_is_untouched(self):
+        waveform = np.ones(MIN_SAMPLES + 1, dtype=np.float32)
+        self.assertIs(ensure_min_length(waveform), waveform)
 
 
 BASE_DATA_PATH = Path(__file__).parent / 'data'

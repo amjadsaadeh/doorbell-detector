@@ -6,7 +6,61 @@ import numpy as np
 import pandas as pd
 import soundfile as sf
 
-from src.draw_data import external_background_rows, split_background_draw
+from src import draw_data
+from src.draw_data import (
+    external_background_rows,
+    get_yamnet_features,
+    split_background_draw,
+)
+
+
+class TestGetYamnetFeatures(unittest.TestCase):
+    """Chunk slicing over per-file YAMNet frame embeddings (0.48s hop),
+    mean-pooled to a fixed-size vector regardless of how many frames the
+    file actually has (a 2s augmented clip has 3 frames, a 2s slice of a
+    long file has 4 — see the MFCC frame-rate comment in draw_data.py)."""
+
+    def setUp(self):
+        self._tmp_dir = tempfile.TemporaryDirectory()
+        self._orig_base = draw_data.YAMNET_FEATURES_FILE_BASE
+        draw_data.YAMNET_FEATURES_FILE_BASE = Path(self._tmp_dir.name)
+
+    def tearDown(self):
+        draw_data.YAMNET_FEATURES_FILE_BASE = self._orig_base
+        self._tmp_dir.cleanup()
+
+    def _write_embeddings(self, name: str, n_frames: int, dim: int = 8) -> np.ndarray:
+        # frame i is a constant vector of value i, so an expected mean over
+        # any frame range is trivial to compute
+        emb = np.tile(np.arange(n_frames, dtype=np.float32), (dim, 1))
+        np.save(Path(self._tmp_dir.name) / name.replace(".wav", ".npy"), emb)
+        return emb
+
+    def test_full_chunk_of_long_file(self):
+        self._write_embeddings("long.wav", n_frames=10)
+        res = get_yamnet_features(0, 2000, "long.wav")
+        # 2000ms // 480ms hop -> frames 0..3
+        np.testing.assert_allclose(res, np.full(8, np.mean([0, 1, 2, 3])))
+        self.assertEqual(res.shape, (8,))
+
+    def test_chunk_with_offset(self):
+        self._write_embeddings("long.wav", n_frames=10)
+        res = get_yamnet_features(1000, 3000, "long.wav")
+        # start frame 1000 // 480 = 2 -> frames 2..5
+        np.testing.assert_allclose(res, np.full(8, np.mean([2, 3, 4, 5])))
+
+    def test_exactly_chunk_sized_file_has_one_frame_less(self):
+        # a 2s clip yields only 3 YAMNet frames (no final partial window);
+        # pooling must still return the same shape as the 4-frame case
+        self._write_embeddings("aug.wav", n_frames=3)
+        res = get_yamnet_features(0, 2000, "aug.wav")
+        np.testing.assert_allclose(res, np.full(8, np.mean([0, 1, 2])))
+        self.assertEqual(res.shape, (8,))
+
+    def test_empty_slice_falls_back_to_last_frame(self):
+        self._write_embeddings("short.wav", n_frames=4)
+        res = get_yamnet_features(2000, 4000, "short.wav")
+        np.testing.assert_allclose(res, np.full(8, 3.0))
 
 
 class TestSplitBackgroundDraw(unittest.TestCase):

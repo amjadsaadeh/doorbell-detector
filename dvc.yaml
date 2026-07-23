@@ -66,18 +66,17 @@ stages:
     - data/augmented_annotations.csv
 
   extract_features:
-    cmd: python src/extract_mfcc_features.py
+    cmd: python src/extract_yamnet_features.py
     deps:
     - data/audio
     - data/augmented_audio
     - data/noise/esc50
     - data/noise/demand
-    - src/extract_mfcc_features.py
+    - src/extract_yamnet_features.py
     params:
-    - feature_extraction
     - augmentation.external_noise_pools
     outs:
-    - data/mfcc_data/
+    - data/yamnet_data/
 
   draw_data:
     cmd: python src/draw_data.py
@@ -90,7 +89,7 @@ stages:
     deps:
     - data/annotation_per_row_data.csv
     - data/augmented_annotations.csv
-    - data/mfcc_data/
+    - data/yamnet_data/
     - data/noise/esc50
     - data/noise/demand
     - src/draw_data.py

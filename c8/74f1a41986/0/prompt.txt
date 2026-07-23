@@ -1,0 +1,7 @@
+<task-notification>
+<task-id>bc0uqtz0d</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/tmp/claude-1000/-home-orchid-projects-doorbell-detector/9298e537-72f8-4fb8-b9a0-a2ce4d76c687/tasks/bc0uqtz0d.output</output-file>
+<status>completed</status>
+<summary>Background command "Run full DVC pipeline on stft branch" completed (exit code 0)</summary>
+</task-notification>

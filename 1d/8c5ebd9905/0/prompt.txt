@@ -1,0 +1,5 @@
+so CNN +spectrogram might be suitable to run on my Raspberry Pi Zero?
+
+---
+
+make a plan and place IT as md file first

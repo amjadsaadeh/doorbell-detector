@@ -70,7 +70,11 @@ stages:
     deps:
     - data/audio
     - data/augmented_audio
+    - data/noise/esc50
+    - data/noise/demand
     - src/extract_stft_features.py
+    params:
+    - augmentation.external_noise_pools
     outs:
     - data/stft_data/
 
@@ -78,12 +82,16 @@ stages:
     cmd: python src/draw_data.py
     params:
     - inbalance_ratio
+    - external_background_ratio
     - chunk_size
     - chunk_overlap
+    - augmentation.external_noise_pools
     deps:
     - data/annotation_per_row_data.csv
     - data/augmented_annotations.csv
     - data/stft_data/
+    - data/noise/esc50
+    - data/noise/demand
     - src/draw_data.py
     outs:
     - data/balanced_data.h5

@@ -1,5 +1,6 @@
 from pathlib import Path
 import numpy as np
+import yaml
 from scipy.signal import stft
 from pydub import AudioSegment
 from pydub.utils import mediainfo
@@ -65,3 +66,10 @@ if __name__ == "__main__":
     process_audio_data(
         AUGMENTED_AUDIO_DATA_PATH, Path("./data/stft_data")
     )
+    # External noise pool files too (used as extra background chunks in
+    # draw_data.py). Also flat: pool naming schemes (ESC-50 fold-id clips,
+    # DEMAND <ENV>_ch01) don't collide with recordings or aug_* files.
+    with open("params.yaml", "r") as file:
+        params = yaml.safe_load(file)
+    for pool_path in params["augmentation"]["external_noise_pools"]:
+        process_audio_data(Path(pool_path), Path("./data/stft_data"))

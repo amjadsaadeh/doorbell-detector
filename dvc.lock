@@ -142,7 +142,7 @@ stages:
       size: 803544240
       nfiles: 2565
   train_model:
-    cmd: python src/train_xgboost.py
+    cmd: python src/train_cnn.py
     deps:
     - path: data/balanced_data.h5
       hash: md5
@@ -164,6 +164,10 @@ stages:
       hash: md5
       md5: b1a872921f089791572da317cc8646b2
       size: 55
+    - path: src/train_cnn.py
+      hash: md5
+      md5: c0beee1f60e1396261657ddbebbccc61
+      size: 7152
     - path: src/train_xgboost.py
       hash: md5
       md5: 2af970a02427a5939eacafe96172b24c
@@ -171,20 +175,24 @@ stages:
     params:
       params.yaml:
         model:
-          n_estimators: 25
-          max_depth: 6
-          learning_rate: 0.1
+          learning_rate: 0.001
+          batch_size: 32
+          epochs: 100
+          early_stopping_patience: 10
+          dropout: 0.3
+          log_compress: true
           random_state: 42
-          eval_metric:
-          - logloss
-          - error
         training:
           test_size: 0.2
     outs:
-    - path: models/xgboost_model.json
+    - path: models/cnn_model.keras
       hash: md5
-      md5: 6d4d75a041c4c7e14eacbfc3c3e0ae1f
-      size: 49183
+      md5: e2e0f3fceeb48f7c4315e9a973606baf
+      size: 214562
+    - path: models/cnn_normalization.npz
+      hash: md5
+      md5: 39a4e087d8a974c145eff62a9f4a9ed2
+      size: 1532
   draw_data:
     cmd: python src/draw_data.py
     deps:

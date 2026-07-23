@@ -1,5 +1,5 @@
-I want to improve the dataset. give me a list of free to use Datasets of Background noises to augment my Data. what Else can I do additionally?
+commit and push in git and dvc
 
 ---
 
-yes do IT for esc-50 and demand. create a Stage for each Pool and take the downsampling into account
+yes continue the port

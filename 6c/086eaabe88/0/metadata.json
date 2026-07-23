@@ -3,14 +3,12 @@
   "checkpoint_id": "6c086eaabe88",
   "session_id": "dbafbc06-211b-43ae-b703-15c78998151a",
   "strategy": "manual-commit",
-  "created_at": "2026-07-23T05:58:19.046100968Z",
-  "branch": "main",
-  "checkpoints_count": 2,
-  "save_step_count": 1,
+  "created_at": "2026-07-23T06:29:17.508281125Z",
+  "branch": "stft-spectrogram-features",
+  "checkpoints_count": 1,
   "files_touched": [
     ".gitignore",
     "data/noise/.gitignore",
-    "dvc.lock",
     "dvc.yaml",
     "params.yaml",
     "src/augment_data.py",
@@ -21,27 +19,29 @@
   ],
   "agent": "Claude Code",
   "model": "",
-  "turn_id": "7f3d955cdbe9",
-  "compact_transcript_start": 0,
+  "turn_id": "fd5171e10fec",
+  "checkpoint_transcript_start": 274,
+  "transcript_lines_at_start": 274,
+  "compact_transcript_start": 63,
   "token_usage": {
-    "input_tokens": 46,
-    "cache_creation_tokens": 175186,
-    "cache_read_tokens": 1626782,
-    "output_tokens": 40799,
-    "api_call_count": 23
+    "input_tokens": 14,
+    "cache_creation_tokens": 11472,
+    "cache_read_tokens": 871199,
+    "output_tokens": 6116,
+    "api_call_count": 7
   },
   "session_metrics": {
-    "turn_count": 2
+    "turn_count": 6
   },
   "initial_attribution": {
-    "calculated_at": "2026-07-23T05:58:19.013310748Z",
-    "agent_lines": 467,
-    "agent_removed": 24,
+    "calculated_at": "2026-07-23T06:29:17.449629528Z",
+    "agent_lines": 4,
+    "agent_removed": 22,
     "human_added": 0,
     "human_modified": 0,
     "human_removed": 0,
-    "total_committed": 467,
-    "total_lines_changed": 491,
+    "total_committed": 4,
+    "total_lines_changed": 26,
     "agent_percentage": 100,
     "metric_version": 2
   },
@@ -52,17 +52,6 @@
       "user_lines_removed": 0,
       "agent_lines_added": 0,
       "agent_lines_removed": 0,
-      "user_added_per_file": {
-        ".claude/scheduled_tasks.lock": 1,
-        ".claude/settings.local.json": 20
-      }
-    },
-    {
-      "checkpoint_number": 2,
-      "user_lines_added": 21,
-      "user_lines_removed": 0,
-      "agent_lines_added": 467,
-      "agent_lines_removed": 24,
       "user_added_per_file": {
         ".claude/scheduled_tasks.lock": 1,
         ".claude/settings.local.json": 20

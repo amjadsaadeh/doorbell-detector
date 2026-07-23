@@ -2,12 +2,11 @@
   "cli_version": "0.8.42",
   "checkpoint_id": "6c086eaabe88",
   "strategy": "manual-commit",
-  "branch": "main",
-  "checkpoints_count": 2,
+  "branch": "stft-spectrogram-features",
+  "checkpoints_count": 1,
   "files_touched": [
     ".gitignore",
     "data/noise/.gitignore",
-    "dvc.lock",
     "dvc.yaml",
     "params.yaml",
     "src/augment_data.py",
@@ -26,10 +25,10 @@
     }
   ],
   "token_usage": {
-    "input_tokens": 46,
-    "cache_creation_tokens": 175186,
-    "cache_read_tokens": 1626782,
-    "output_tokens": 40799,
-    "api_call_count": 23
+    "input_tokens": 14,
+    "cache_creation_tokens": 11472,
+    "cache_read_tokens": 871199,
+    "output_tokens": 6116,
+    "api_call_count": 7
   }
 }

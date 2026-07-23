@@ -1,0 +1,44 @@
+{
+  "cli_version": "0.8.42",
+  "checkpoint_id": "e03452196ca6",
+  "session_id": "dbafbc06-211b-43ae-b703-15c78998151a",
+  "strategy": "manual-commit",
+  "created_at": "2026-07-23T06:31:46.893434745Z",
+  "branch": "stft-spectrogram-features",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "dvc.yaml",
+    "params.yaml",
+    "src/draw_data.py",
+    "src/extract_stft_features.py",
+    "tests/draw_data_test.py"
+  ],
+  "agent": "Claude Code",
+  "model": "",
+  "turn_id": "fd5171e10fec",
+  "checkpoint_transcript_start": 370,
+  "transcript_lines_at_start": 370,
+  "compact_transcript_start": 87,
+  "token_usage": {
+    "input_tokens": 0,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 0,
+    "output_tokens": 0,
+    "api_call_count": 0
+  },
+  "session_metrics": {
+    "turn_count": 6
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-07-23T06:31:46.831993182Z",
+    "agent_lines": 163,
+    "agent_removed": 5,
+    "human_added": 0,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 163,
+    "total_lines_changed": 168,
+    "agent_percentage": 100,
+    "metric_version": 2
+  }
+}

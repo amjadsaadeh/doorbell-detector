@@ -70,9 +70,12 @@ stages:
     deps:
     - data/audio
     - data/augmented_audio
+    - data/noise/esc50
+    - data/noise/demand
     - src/extract_mfcc_features.py
     params:
     - feature_extraction
+    - augmentation.external_noise_pools
     outs:
     - data/mfcc_data/
 
@@ -80,12 +83,16 @@ stages:
     cmd: python src/draw_data.py
     params:
     - inbalance_ratio
+    - external_background_ratio
     - chunk_size
     - chunk_overlap
+    - augmentation.external_noise_pools
     deps:
     - data/annotation_per_row_data.csv
     - data/augmented_annotations.csv
     - data/mfcc_data/
+    - data/noise/esc50
+    - data/noise/demand
     - src/draw_data.py
     outs:
     - data/balanced_data.h5

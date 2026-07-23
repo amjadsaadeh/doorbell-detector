@@ -116,31 +116,44 @@ stages:
       md5: 7e03bb91d71e0e8910f9b65e45595032.dir
       size: 37785960
       nfiles: 590
+    - path: data/noise/demand
+      hash: md5
+      md5: 1d9ac0c06a853fd4dc33d7c4493d3a50.dir
+      size: 38400688
+      nfiles: 4
+    - path: data/noise/esc50
+      hash: md5
+      md5: 85588592640f55e87116bdd3aff2a4bb.dir
+      size: 307284480
+      nfiles: 1920
     - path: src/extract_mfcc_features.py
       hash: md5
-      md5: 46b9dd2dd0448d0c9434360896a3918b
-      size: 2451
+      md5: 649d32b1c84af6f869345034c9079fc3
+      size: 2816
     params:
       params.yaml:
+        augmentation.external_noise_pools:
+        - data/noise/esc50
+        - data/noise/demand
         feature_extraction:
           n_mfcc: 13
           n_fft: 512
     outs:
     - path: data/mfcc_data/
       hash: md5
-      md5: 2a3a99ab213d5d4fa55711d78ff1d539.dir
-      size: 2752040
-      nfiles: 641
+      md5: ce529fad2251baa58f9477a3215a2d9f.dir
+      size: 20623400
+      nfiles: 2565
   train_model:
     cmd: python src/train_xgboost.py
     deps:
     - path: data/balanced_data.h5
       hash: md5
-      md5: f3cff7daa1f5e4e4033a830c4267307b
-      size: 5431248
+      md5: 7c22a0fafc2b91f2d228a28154151643
+      size: 5447496
     - path: data/data_quality/chunk_balanced_quality.json
       hash: md5
-      md5: 698fc7223476909324db7214f0050491
+      md5: 567e53b8e1cbd34a94241d3182c3c925
       size: 104
     - path: data/data_quality/chunks_per_label.csv
       hash: md5
@@ -173,8 +186,8 @@ stages:
     outs:
     - path: models/xgboost_model.json
       hash: md5
-      md5: 606a0ea6a110c180606a9e5fe29dfc4a
-      size: 39570
+      md5: 68e9a5570452bf5691cc6a1d22a086ff
+      size: 50158
   draw_data:
     cmd: python src/draw_data.py
     deps:
@@ -188,26 +201,40 @@ stages:
       size: 70016
     - path: data/mfcc_data/
       hash: md5
-      md5: 2a3a99ab213d5d4fa55711d78ff1d539.dir
-      size: 2752040
-      nfiles: 641
+      md5: ce529fad2251baa58f9477a3215a2d9f.dir
+      size: 20623400
+      nfiles: 2565
+    - path: data/noise/demand
+      hash: md5
+      md5: 1d9ac0c06a853fd4dc33d7c4493d3a50.dir
+      size: 38400688
+      nfiles: 4
+    - path: data/noise/esc50
+      hash: md5
+      md5: 85588592640f55e87116bdd3aff2a4bb.dir
+      size: 307284480
+      nfiles: 1920
     - path: src/draw_data.py
       hash: md5
-      md5: fd5c5fb7138db158702e880ed8c5aec1
-      size: 5759
+      md5: 4ced3eb486ed01205bae9d58d4ba3cb3
+      size: 9073
     params:
       params.yaml:
+        augmentation.external_noise_pools:
+        - data/noise/esc50
+        - data/noise/demand
         chunk_overlap: 250
         chunk_size: 2000
+        external_background_ratio: 0.5
         inbalance_ratio: 1.0
     outs:
     - path: data/balanced_data.h5
       hash: md5
-      md5: f3cff7daa1f5e4e4033a830c4267307b
-      size: 5431248
+      md5: 7c22a0fafc2b91f2d228a28154151643
+      size: 5447496
     - path: data/data_quality/chunk_balanced_quality.json
       hash: md5
-      md5: 698fc7223476909324db7214f0050491
+      md5: 567e53b8e1cbd34a94241d3182c3c925
       size: 104
     - path: data/data_quality/chunks_per_label.csv
       hash: md5

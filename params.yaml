@@ -1,6 +1,11 @@
 chunk_size: 2000 # ms
 chunk_overlap: 250 #ms
 inbalance_ratio: 1.0 # How much more background samples should be drawn
+# Share of the drawn background chunks that comes from the external noise
+# pools instead of the labeled recordings. If one source can't fill its
+# share (e.g. inbalance_ratio > 1 exhausts the real background chunks),
+# the other tops it up.
+external_background_ratio: 0.5
 
 augmentation:
   # Target signal-to-noise ratios (dB) for synthetic front_doorbell samples,

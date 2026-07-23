@@ -79,3 +79,8 @@ if __name__ == "__main__":
     process_audio_data(
         params, AUGMENTED_AUDIO_DATA_PATH, Path("./data/mfcc_data")
     )
+    # External noise pool files too (used as extra background chunks in
+    # draw_data.py). Also flat: pool naming schemes (ESC-50 fold-id clips,
+    # DEMAND <ENV>_ch01) don't collide with recordings or aug_* files.
+    for pool_path in params["augmentation"]["external_noise_pools"]:
+        process_audio_data(params, Path(pool_path), Path("./data/mfcc_data"))

@@ -12,6 +12,24 @@ augmentation:
   # Uniform loudness jitter (+/- dB) applied to each mixed sample so synthetic
   # positives vary in absolute level, not just SNR
   gain_jitter_db: 6
+  # External noise pools (prepared by the fetch_noise_* stages). Per mix the
+  # pool is chosen uniformly first, then a window within it, so the small
+  # labeled-background pool isn't drowned out by these much larger ones.
+  external_noise_pools:
+    - data/noise/esc50
+    - data/noise/demand
+
+noise_pools:
+  esc50:
+    # Bell-like classes are excluded: at the low end of the SNR sweep the
+    # noise dominates the mixture, and a mostly-bell sample labeled
+    # front_doorbell would teach the model that other bells are doorbells.
+    exclude_categories: [church_bells, clock_alarm]
+  demand:
+    # Domestic environments plus a hallway — closest to the deployed setting.
+    # Other options: OOFFICE, OMEETING, PCAFETER, PRESTO, PSTATION, TBUS,
+    # TCAR, TMETRO, SPSQUARE, STRAFFIC, SCAFE, NFIELD, NPARK, NRIVER
+    environments: [DKITCHEN, DLIVING, DWASHING, OHALLWAY]
 
 training:
   test_size: 0.2

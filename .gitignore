@@ -4,6 +4,8 @@
 .env
 dvc_remote
 tests/data/tmp_mfcc_data/
+# archive cache for the external noise pool stages (not a DVC output)
+data/downloads/
 
 # local credentials (Label Studio + S3), never committed
 .env.local

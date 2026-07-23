@@ -29,10 +29,32 @@ stages:
     outs:
     - data/data_quality/sample_based_quality.json
     - data/data_quality/samples_per_label.csv
+  fetch_noise_esc50:
+    cmd: python src/fetch_noise_esc50.py
+    deps:
+    - src/fetch_noise_esc50.py
+    - src/noise_pool.py
+    params:
+    - noise_pools.esc50
+    outs:
+    - data/noise/esc50
+
+  fetch_noise_demand:
+    cmd: python src/fetch_noise_demand.py
+    deps:
+    - src/fetch_noise_demand.py
+    - src/noise_pool.py
+    params:
+    - noise_pools.demand
+    outs:
+    - data/noise/demand
+
   augmentation:
     cmd: python src/augment_data.py
     deps:
     - data/audio
+    - data/noise/esc50
+    - data/noise/demand
     - data/annotation_per_row_data.csv
     - src/augment_data.py
     params:

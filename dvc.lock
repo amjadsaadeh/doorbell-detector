@@ -113,7 +113,7 @@ stages:
       nfiles: 51
     - path: data/augmented_audio
       hash: md5
-      md5: 77b7fbda7099c07ab97efa020bb689f4.dir
+      md5: 7e03bb91d71e0e8910f9b65e45595032.dir
       size: 37785960
       nfiles: 590
     - path: src/extract_mfcc_features.py
@@ -128,7 +128,7 @@ stages:
     outs:
     - path: data/mfcc_data/
       hash: md5
-      md5: b587bbb6996d6f995281965d206ea76a.dir
+      md5: 2a3a99ab213d5d4fa55711d78ff1d539.dir
       size: 2752040
       nfiles: 641
   train_model:
@@ -136,8 +136,8 @@ stages:
     deps:
     - path: data/balanced_data.h5
       hash: md5
-      md5: 8c9b207e78bc365ed58be80a8989cb0a
-      size: 5423664
+      md5: f3cff7daa1f5e4e4033a830c4267307b
+      size: 5431248
     - path: data/data_quality/chunk_balanced_quality.json
       hash: md5
       md5: 698fc7223476909324db7214f0050491
@@ -173,8 +173,8 @@ stages:
     outs:
     - path: models/xgboost_model.json
       hash: md5
-      md5: a79d620301d2ba79188da54fd92137ae
-      size: 38460
+      md5: 606a0ea6a110c180606a9e5fe29dfc4a
+      size: 39570
   draw_data:
     cmd: python src/draw_data.py
     deps:
@@ -184,11 +184,11 @@ stages:
       size: 6187
     - path: data/augmented_annotations.csv
       hash: md5
-      md5: 5d2f46931f4a334c3c0f6a771da550d4
-      size: 63847
+      md5: d5e03769298bb73b1984c1978615f47a
+      size: 70016
     - path: data/mfcc_data/
       hash: md5
-      md5: b587bbb6996d6f995281965d206ea76a.dir
+      md5: 2a3a99ab213d5d4fa55711d78ff1d539.dir
       size: 2752040
       nfiles: 641
     - path: src/draw_data.py
@@ -203,8 +203,8 @@ stages:
     outs:
     - path: data/balanced_data.h5
       hash: md5
-      md5: 8c9b207e78bc365ed58be80a8989cb0a
-      size: 5423664
+      md5: f3cff7daa1f5e4e4033a830c4267307b
+      size: 5431248
     - path: data/data_quality/chunk_balanced_quality.json
       hash: md5
       md5: 698fc7223476909324db7214f0050491
@@ -225,10 +225,20 @@ stages:
       md5: 76e7b567abe76d809d629e6189db13d2.dir
       size: 14636020
       nfiles: 51
+    - path: data/noise/demand
+      hash: md5
+      md5: 1d9ac0c06a853fd4dc33d7c4493d3a50.dir
+      size: 38400688
+      nfiles: 4
+    - path: data/noise/esc50
+      hash: md5
+      md5: 85588592640f55e87116bdd3aff2a4bb.dir
+      size: 307284480
+      nfiles: 1920
     - path: src/augment_data.py
       hash: md5
-      md5: b9470a955a166a3e8fcee10d801dd343
-      size: 6620
+      md5: 84ad3989a2d84c7944a94d6fe4e878f9
+      size: 10578
     params:
       params.yaml:
         augmentation:
@@ -240,15 +250,66 @@ stages:
           - 15
           pairs_per_signal_chunk: 2
           gain_jitter_db: 6
+          external_noise_pools:
+          - data/noise/esc50
+          - data/noise/demand
         chunk_overlap: 250
         chunk_size: 2000
     outs:
     - path: data/augmented_annotations.csv
       hash: md5
-      md5: 5d2f46931f4a334c3c0f6a771da550d4
-      size: 63847
+      md5: d5e03769298bb73b1984c1978615f47a
+      size: 70016
     - path: data/augmented_audio
       hash: md5
-      md5: 77b7fbda7099c07ab97efa020bb689f4.dir
+      md5: 7e03bb91d71e0e8910f9b65e45595032.dir
       size: 37785960
       nfiles: 590
+  fetch_noise_demand:
+    cmd: python src/fetch_noise_demand.py
+    deps:
+    - path: src/fetch_noise_demand.py
+      hash: md5
+      md5: b3834fe0baf12d9548e6ec8504bffcf9
+      size: 1516
+    - path: src/noise_pool.py
+      hash: md5
+      md5: 4dd97f54da52eb5c954e5c6bc5f47a04
+      size: 2404
+    params:
+      params.yaml:
+        noise_pools.demand:
+          environments:
+          - DKITCHEN
+          - DLIVING
+          - DWASHING
+          - OHALLWAY
+    outs:
+    - path: data/noise/demand
+      hash: md5
+      md5: 1d9ac0c06a853fd4dc33d7c4493d3a50.dir
+      size: 38400688
+      nfiles: 4
+  fetch_noise_esc50:
+    cmd: python src/fetch_noise_esc50.py
+    deps:
+    - path: src/fetch_noise_esc50.py
+      hash: md5
+      md5: faefd9884c88b5fa00dbffdff9c4b92d
+      size: 2142
+    - path: src/noise_pool.py
+      hash: md5
+      md5: 4dd97f54da52eb5c954e5c6bc5f47a04
+      size: 2404
+    params:
+      params.yaml:
+        noise_pools.esc50:
+          exclude_categories:
+          - church_bells
+          - clock_alarm
+    outs:
+    - path: data/noise/esc50
+      hash: md5
+      md5: 85588592640f55e87116bdd3aff2a4bb.dir
+      size: 307284480
+      nfiles: 1920

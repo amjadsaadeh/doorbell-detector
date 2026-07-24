@@ -24,6 +24,37 @@
   "session_metrics": {
     "turn_count": 2
   },
+  "summary": {
+    "intent": "Determine whether a suitable ML inference runtime exists for running a CNN on a Raspberry Pi Zero W (ARMv6), then bring CLAUDE.md and README.md up to date with the project's current state (CNN pipeline, noise pools, model experiments).",
+    "outcome": "Confirmed no off-the-shelf inference runtime supports ARMv6/Python 3.11 on the Pi Zero W, validating the existing plan to use a pure-numpy forward pass; then rewrote CLAUDE.md and README.md to reflect the current CNN pipeline, noise pool fetch stages, model experiment results, and updated test count, and pushed the changes to the cnn-spectrogram branch.",
+    "learnings": {
+      "repo": [
+        "Project doorbell-detector uses a DVC pipeline with stages including fetch_noise_esc50 and fetch_noise_demand feeding into train_cnn.py, which has replaced/supplemented XGBoost as the current train_model entrypoint",
+        "augmentation.external_noise_pools config feeds both data augmentation and background balancing using ESC-50/DEMAND noise pools",
+        "Model branch comparison results: yamnet-features 0.9956 > cnn-mfcc 0.9913 > cnn-spectrogram 0.9826 > xgboost-mfcc 0.9519",
+        "Test suite currently has 61 passing tests (was stale at 44 in CLAUDE.md)",
+        ".planning/STATE.md only reflects the v1.0 milestone; ML pipeline work since then has been tracked via ad-hoc docs/superpowers/ plans instead of the formal GSD workflow",
+        "Target Pi Zero W runs Python 3.11.2 on armv6l, Raspbian 12 Bookworm (verified via ssh)"
+      ],
+      "code": [],
+      "workflow": [
+        "Before trusting an existing planning doc's technical assumption (e.g., 'no ARMv6 runtime exists'), verify it against current ecosystem state via web search rather than accepting it at face value",
+        "When updating documentation, cross-check actual repo state (dvc.yaml, params.yaml, test runs, branch list) rather than relying on stale docs like README/CLAUDE.md",
+        "SSH into target hardware to confirm actual runtime environment (Python version, OS, architecture) before making deployment recommendations"
+      ]
+    },
+    "friction": [
+      "Official prebuilt wheels for TFLite runtime and TFLite Micro on Pi Zero are built for Python 3.7 (cp37), incompatible with the Pi's actual Python 3.11 — would require redoing the cross-compile toolchain",
+      "ONNX Runtime officially does not support Pi 1/Zero (armv6l) at all",
+      "ncnn has no armv6l Python wheels and its performance benefits rely on NEON, which the Pi Zero's ARMv6 core lacks",
+      "README.md was found to be stale (still described MFCC-only/XGBoost-only pipeline) and required a separate follow-up request to fix"
+    ],
+    "open_items": [
+      "TFLite Micro (via CMSIS-NN, ~8x speedup measured by driedler) remains a fallback option worth revisiting only if the pure-numpy benchmark (Task 3 of the CNN-on-Pi plan) proves too slow, but would require rebuilding the cp37 wheel for cp311",
+      "Numpy-based CNN forward pass benchmark on the actual Pi Zero W still needs to be run to confirm latency is acceptable",
+      "GSD workflow / .planning/STATE.md is out of date relative to actual ML pipeline progress and may need reconciling"
+    ]
+  },
   "initial_attribution": {
     "calculated_at": "2026-07-24T15:17:53.47740456Z",
     "agent_lines": 80,

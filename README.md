@@ -46,9 +46,20 @@ The pipeline (`dvc.yaml`) is fully reproducible with DVC and runs end-to-end wit
 1. fetch the label export from the Label Studio API
 2. convert it to one-annotation-per-row (normalizing all audio references to `s3://` URIs)
 3. download only missing audio files from S3 (incremental, pruned)
-4. extract MFCC features
-5. cut into chunks and balance bell vs. background
-6. train an XGBoost classifier, tracked with MLflow
+4. fetch external background-noise pools (ESC-50, DEMAND)
+5. augment the minority `front_doorbell` class by SNR-mixing real bell chunks with
+   background noise (real recordings + the external pools)
+6. extract STFT spectrogram features
+7. cut into chunks and balance bell vs. background
+8. train a classifier, tracked with MLflow
+
+The classifier itself is under active experimentation across branches — XGBoost on
+flattened features, small CNNs directly on the 2D spectrogram/MFCC chunks, and YAMNet
+embeddings. Val F1 so far: YAMNet embeddings (0.9956) > CNN/MFCC (0.9913) >
+CNN/spectrogram (0.9826, this branch) > XGBoost/MFCC (0.9519). Since the Pi Zero W is
+ARMv6 and can't install TensorFlow, librosa, or xgboost, getting the winning model onto
+the Pi means a pure-numpy/scipy reimplementation of its forward pass, not the training
+framework itself — see `docs/superpowers/plans/` for the in-progress work on that.
 
 # Running It
 
@@ -81,13 +92,19 @@ PYTHONPATH=./src:. uv run pytest tests/   # run the tests
 
 | Path | What it is |
 |------|------------|
-| `src/` | DVC pipeline stages (fetch, convert, download, features, training) |
+| `src/` | DVC pipeline stages (fetch, convert, download, noise pools, augmentation, features, training) |
 | `dvc.yaml`, `params.yaml` | pipeline definition and tunable parameters |
+| `models/` | DVC-tracked trained model artifacts |
 | `data_collection/` | everything that runs on the Pi (detector, collector, systemd units) |
 | `tests/` | unit tests for the pipeline scripts |
-| `.planning/` | planning docs (requirements, roadmap, state) |
+| `.planning/` | v1.0 milestone planning docs (requirements, roadmap, state) |
+| `docs/superpowers/` | post-milestone design specs and implementation plans (ML pipeline evolution, CNN-on-Pi inference) |
 
 # Status & Ideas
 
 v1.0 of the on-Pi detector is deployed and working (cross-correlation + MQTT + clip capture).
-Ideas for later: multiple templates, frequency-domain matching, GPIO button trigger, Prometheus metrics, and deploying the trained XGBoost model to the Pi.
+Since then, work has focused on the ML side: SNR-mixed augmentation, external noise
+pools, and small-CNN model experiments aimed at running the trained model directly on
+the Pi (see `docs/superpowers/plans/2026-07-23-cnn-pi-inference.md`). Other ideas for
+later: multiple templates, frequency-domain matching, GPIO button trigger, and
+Prometheus metrics.

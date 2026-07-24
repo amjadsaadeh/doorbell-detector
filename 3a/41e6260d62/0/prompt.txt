@@ -1,0 +1,5 @@
+is there a suitable runtime Out there to use my CNN Implementation on my Raspberry Pi Zero w?
+
+---
+
+update the Claude md File to the current state of the project

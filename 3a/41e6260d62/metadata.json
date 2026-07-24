@@ -1,0 +1,26 @@
+{
+  "cli_version": "0.8.42",
+  "checkpoint_id": "3a41e6260d62",
+  "strategy": "manual-commit",
+  "branch": "cnn-spectrogram",
+  "checkpoints_count": 2,
+  "files_touched": [
+    "CLAUDE.md"
+  ],
+  "sessions": [
+    {
+      "metadata": "/3a/41e6260d62/0/metadata.json",
+      "transcript": "/3a/41e6260d62/0/full.jsonl",
+      "compact_transcript": "/3a/41e6260d62/0/transcript.jsonl",
+      "content_hash": "/3a/41e6260d62/0/content_hash.txt",
+      "prompt": "/3a/41e6260d62/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 1204,
+    "cache_creation_tokens": 208092,
+    "cache_read_tokens": 1360741,
+    "output_tokens": 19483,
+    "api_call_count": 24
+  }
+}

@@ -2,15 +2,9 @@
   "cli_version": "0.8.42",
   "checkpoint_id": "bedf520b38ef",
   "strategy": "manual-commit",
+  "branch": "unified-pipeline",
   "checkpoints_count": 3,
-  "files_touched": [
-    "data/features/.gitignore",
-    "dvc.lock",
-    "models/tflite_metrics.json",
-    "params.yaml",
-    "pyproject.toml",
-    "uv.lock"
-  ],
+  "files_touched": null,
   "sessions": [
     {
       "metadata": "/be/df520b38ef/0/metadata.json",
@@ -21,10 +15,10 @@
     }
   ],
   "token_usage": {
-    "input_tokens": 50,
-    "cache_creation_tokens": 31191,
-    "cache_read_tokens": 5012532,
-    "output_tokens": 14853,
-    "api_call_count": 25
+    "input_tokens": 177,
+    "cache_creation_tokens": 213659,
+    "cache_read_tokens": 13740799,
+    "output_tokens": 95228,
+    "api_call_count": 90
   }
 }

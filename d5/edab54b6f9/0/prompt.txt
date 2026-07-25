@@ -1,0 +1,20 @@
+you told me running my ann on my pi zero w might be hard to habdle.
+
+---
+
+you told me running my ann on my pi zero w might be hard to handle. give me 3 hardware suggestions with low power consumption to replace my pi zero w setup
+
+---
+
+i got a Google Coral dev Board, may IT possible to Put my Mic hat on IT and Run my model on IT?
+
+---
+
+ok create me a plan for using the esp32s3. IT should contain:
+- a Pipeline to Port my Models to this (using Edge Impuls or tflite Micro)
+- capabilty to listen to mqtt Trigger for.manual recording
+- publishing Sound Data in s3 in conjunction with an mqtt message
+
+---
+
+OK apply Phase 1 ad 2 in a new branch and Run  the Training..give me Changes in f1 and accuracy First in comparison to the other Implementations. check the 40x100 geometry

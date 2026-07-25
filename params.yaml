@@ -9,9 +9,17 @@ external_background_ratio: 0.5
 
 augmentation:
   # Target signal-to-noise ratios (dB) for synthetic front_doorbell samples,
-  # doorbell = signal, everything else = noise. Spans noise-dominant (-5dB)
+  # doorbell = signal, everything else = noise. Spans deeply buried (-15dB)
   # to clearly audible (+15dB) to cover realistic in-the-wild conditions.
-  snrs_db: [-5, 0, 5, 10, 15]
+  # The -15/-10 levels exist to break a metric ceiling: on the -5..15 sweep
+  # every feature variant scored val_f1 1.0 on a ~230-chunk fold, which
+  # can't separate them. At -15dB the bell sits ~32x below the noise in
+  # power -- hard but still tractable from its narrowband harmonics, where
+  # -20dB would be closer to unlabelable. Relies on the bell-like ESC-50
+  # classes staying excluded (see noise_pools.esc50): with those in the
+  # pool, a noise-dominated mix labeled front_doorbell would teach the
+  # model that any bell is the doorbell.
+  snrs_db: [-15, -10, -5, 0, 5, 10, 15]
   # How many random noise chunks to pair with each real doorbell chunk, per SNR
   pairs_per_signal_chunk: 2
   # Uniform loudness jitter (+/- dB) applied to each mixed sample so synthetic

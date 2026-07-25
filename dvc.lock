@@ -113,9 +113,9 @@ stages:
       nfiles: 51
     - path: data/augmented_audio
       hash: md5
-      md5: 7e03bb91d71e0e8910f9b65e45595032.dir
-      size: 37785960
-      nfiles: 590
+      md5: 21b6c5c280f4d1d214c4f0ffa202c358.dir
+      size: 52900344
+      nfiles: 826
     - path: data/noise/demand
       hash: md5
       md5: 1d9ac0c06a853fd4dc33d7c4493d3a50.dir
@@ -147,23 +147,23 @@ stages:
     outs:
     - path: data/logmel_data/
       hash: md5
-      md5: f630c418c7f282b9ffca50e926231dce.dir
-      size: 62774720
-      nfiles: 2565
+      md5: 51fda3962eabc434b11fb0ab35ce75a7.dir
+      size: 65183808
+      nfiles: 2801
   train_model:
     cmd: python src/train_cnn.py
     deps:
     - path: data/balanced_data.h5
       hash: md5
-      md5: d935296f91b1f4d52b58ddc7dd832633
-      size: 14139992
+      md5: fecd0b28a77ef089411c9d85999ba48b
+      size: 18895736
     - path: data/data_quality/chunk_balanced_quality.json
       hash: md5
-      md5: 567e53b8e1cbd34a94241d3182c3c925
-      size: 104
+      md5: 2e65d6f69a2aa9005f4f9c5042f48f23
+      size: 105
     - path: data/data_quality/chunks_per_label.csv
       hash: md5
-      md5: dd331473138c91c8ebe986ef2dbe6e07
+      md5: 58caac3641437386a1f528be84c542d3
       size: 42
     - path: data/data_quality/sample_based_quality.json
       hash: md5
@@ -196,11 +196,11 @@ stages:
     outs:
     - path: models/cnn_model.keras
       hash: md5
-      md5: af7d70c9bfdbbf3e16d868ec83618ef3
+      md5: afd7258d1dd232c0421da8dd1831ee70
       size: 214542
     - path: models/cnn_normalization.npz
       hash: md5
-      md5: 189fb6a3bdaa0fc25940e36550fded61
+      md5: e01f2eccee69663fb76bf863e05001e9
       size: 820
   draw_data:
     cmd: python src/draw_data.py
@@ -211,13 +211,13 @@ stages:
       size: 6187
     - path: data/augmented_annotations.csv
       hash: md5
-      md5: d5e03769298bb73b1984c1978615f47a
-      size: 70016
+      md5: 47e945cf4d50f6106bf8a53cc2bda7dc
+      size: 99344
     - path: data/logmel_data/
       hash: md5
-      md5: f630c418c7f282b9ffca50e926231dce.dir
-      size: 62774720
-      nfiles: 2565
+      md5: 51fda3962eabc434b11fb0ab35ce75a7.dir
+      size: 65183808
+      nfiles: 2801
     - path: data/noise/demand
       hash: md5
       md5: 1d9ac0c06a853fd4dc33d7c4493d3a50.dir
@@ -253,15 +253,15 @@ stages:
     outs:
     - path: data/balanced_data.h5
       hash: md5
-      md5: d935296f91b1f4d52b58ddc7dd832633
-      size: 14139992
+      md5: fecd0b28a77ef089411c9d85999ba48b
+      size: 18895736
     - path: data/data_quality/chunk_balanced_quality.json
       hash: md5
-      md5: 567e53b8e1cbd34a94241d3182c3c925
-      size: 104
+      md5: 2e65d6f69a2aa9005f4f9c5042f48f23
+      size: 105
     - path: data/data_quality/chunks_per_label.csv
       hash: md5
-      md5: dd331473138c91c8ebe986ef2dbe6e07
+      md5: 58caac3641437386a1f528be84c542d3
       size: 42
   augmentation:
     cmd: python src/augment_data.py
@@ -293,6 +293,8 @@ stages:
       params.yaml:
         augmentation:
           snrs_db:
+          - -15
+          - -10
           - -5
           - 0
           - 5
@@ -308,13 +310,13 @@ stages:
     outs:
     - path: data/augmented_annotations.csv
       hash: md5
-      md5: d5e03769298bb73b1984c1978615f47a
-      size: 70016
+      md5: 47e945cf4d50f6106bf8a53cc2bda7dc
+      size: 99344
     - path: data/augmented_audio
       hash: md5
-      md5: 7e03bb91d71e0e8910f9b65e45595032.dir
-      size: 37785960
-      nfiles: 590
+      md5: 21b6c5c280f4d1d214c4f0ffa202c358.dir
+      size: 52900344
+      nfiles: 826
   fetch_noise_demand:
     cmd: python src/fetch_noise_demand.py
     deps:

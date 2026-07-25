@@ -188,17 +188,27 @@ PYTHONPATH=./src:. uv run pytest tests/
 
 Feature/model variants (`select_chunks` and everything above it stays cached):
 
+Always use `--temp`: a plain `dvc exp run` executes in the workspace, where it
+rewrites `params.yaml`, stages that rewrite into the git index, and leaves HEAD
+detached. `--temp` runs in a throwaway worktree and touches none of it.
+
+`-S key=value` overrides an existing param; `-S +key=value` **adds** one that
+isn't in params.yaml yet (e.g. `n_mfcc`, which only the mfcc type reads).
+
 ```
-uv run dvc exp run -S feature_extraction.type=mfcc \
+# log-mel, the committed default — no overrides needed
+uv run dvc repro
+
+uv run dvc exp run --temp -S feature_extraction.type=mfcc \
   -S feature_extraction.features_dir=./data/features/mfcc-40c-320hop \
-  -S feature_extraction.n_mfcc=40
+  -S +feature_extraction.n_mfcc=40    # '+' — n_mfcc is not in params.yaml
 
-uv run dvc exp run -S feature_extraction.type=stft \
+uv run dvc exp run --temp -S feature_extraction.type=stft \
   -S feature_extraction.features_dir=./data/features/stft-256fft-128hop \
-  -S feature_extraction.n_fft=256 -S feature_extraction.hop_length=128 \
-  -S model.log_compress=true          # raw STFT magnitudes are not log-domain
+  -S feature_extraction.n_fft=256 -S feature_extraction.hop_length=128
+  # log-compression is automatic: features.py declares it for stft
 
-uv run dvc exp run -S feature_extraction.type=yamnet \
+uv run dvc exp run --temp -S feature_extraction.type=yamnet \
   -S feature_extraction.features_dir=./data/features/yamnet \
   -S training.head=xgboost            # yamnet pools the time axis; cnn is rejected
 

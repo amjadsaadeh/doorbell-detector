@@ -1,0 +1,7 @@
+<task-notification>
+<task-id>b06j2qcsh</task-id>
+<tool-use-id>toolu_018LzNJ1ECLr5LkgfTGQ5QYv</tool-use-id>
+<output-file>/tmp/claude-1000/-home-orchid-projects-doorbell-detector/b176bc19-ae06-4cf4-a2ef-39cd5cdd7437/tasks/b06j2qcsh.output</output-file>
+<status>completed</status>
+<summary>Background command "Run YAMNet in temp workspace" completed (exit code 0)</summary>
+</task-notification>

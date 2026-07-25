@@ -98,12 +98,22 @@ to train an XGBoost bell classifier.
   yields 3 embedding frames where a 2s slice of a long file yields 4. That pooling
   removes the time axis, so `yamnet` only works with the `xgboost` head —
   `train_model.py` enforces it.
-- **Train/val split is group-aware** (`prepare_split` in `train_cnn.py`): `StratifiedGroupKFold`
-  grouped by `split_group` (source recording; augmented rows inherit their signal
-  chunk's source file). A plain random chunk split leaks near-duplicate overlapping
-  windows and SNR variants across the split and inflates validation metrics.
-  `training.test_size` maps to the fold fraction (1/n_splits); the realized fraction
-  is logged to MLflow as `realized_test_fraction`.
+- **Train/val split is group-aware and cross-validated** (`src/splits.py`):
+  `StratifiedGroupKFold` grouped by `split_group` (source recording; augmented rows
+  inherit their signal chunk's source file). A plain random chunk split leaks
+  near-duplicate overlapping windows and SNR variants across the split and inflates
+  validation metrics. `training.test_size` maps to the fold fraction (1/n_splits).
+- **Both heads train every fold** and report the mean. Scoring only the first fold is
+  what made every feature variant look like val F1 1.0000: the folds are wildly uneven
+  (183 / 288 / 503 / 338 / 458 chunks on the current dataset) because group sizes vary,
+  and fold 0 is the smallest and easiest. The same log-mel model that scores 1.0000 on
+  fold 0 scores **0.9931 ± 0.0095, worst fold 0.9742** across all five. MLflow gets the
+  mean under the plain name (`val_f1_score`) plus `_std` / `_min` companions and
+  per-fold `fold{i}_*` metrics. `training.n_eval_folds: null` means all folds; set it
+  to 1 for a fast iteration loop, at the old credibility.
+- **The saved model is fold 0's**, and `export_tflite.py` re-derives fold 0 via
+  `prepare_split(..., fold=0)` so int8 is scored against data that model never saw.
+  Do not change one without the other.
 
 ## GSD Workflow
 

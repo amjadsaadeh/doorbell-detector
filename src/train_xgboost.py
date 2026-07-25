@@ -12,10 +12,10 @@ import pandas as pd
 import xgboost as xgb
 import yaml
 from sklearn.metrics import ConfusionMatrixDisplay, classification_report
-from sklearn.model_selection import StratifiedGroupKFold
 from sklearn.preprocessing import LabelEncoder
 
 from paths import DATA_FILE, DATA_QUALITY_DIR, MODEL_DIR
+from splits import aggregate_fold_metrics, iter_folds
 
 MLFLOW_EXPERIMENT_NAME = "doorbell-detector"
 # (json file, metric prefix) pairs produced by extract_data_quality.py (raw,
@@ -95,27 +95,20 @@ def main():
         params = yaml.safe_load(file)
 
     model_params = params["model"]["xgboost"]
+    training = params["training"]
 
     # Load data
     df = pd.read_hdf(DATA_FILE, key="data")
     X, y, le, feature_type = prepare_data(df)
-
-    # Group-aware split: chunks are cut from sliding windows with heavy
-    # overlap, and augmented samples are SNR/gain variants of real chunks —
-    # a random chunk-level split leaks near-duplicates between train and
-    # test. Grouping by split_group (source recording) keeps every window
-    # and synthetic variant of one recording on the same side. test_size
-    # becomes the fold fraction (1/n_splits), stratified at group level.
+    # Group-aware CV; iter_folds owns the leakage argument and the
+    # why-not-one-fold argument (see train_cnn.py).
     groups = df["split_group"].to_numpy()
-    n_splits = max(2, round(1 / params["training"]["test_size"]))
-    splitter = StratifiedGroupKFold(n_splits=n_splits, shuffle=True, random_state=42)
-    train_idx, test_idx = next(splitter.split(X, y, groups))
-    X_train, X_test = X[train_idx], X[test_idx]
-    y_train, y_test = y[train_idx], y[test_idx]
 
     mlflow.set_tracking_uri(os.environ["MLFLOW_TRACKING_URI"])
     mlflow.set_experiment(MLFLOW_EXPERIMENT_NAME)
-    mlflow.xgboost.autolog(log_datasets=False)
+    # log_models=False: one model per fold would be logged otherwise, and
+    # the deliverable is fold 0's, saved explicitly below.
+    mlflow.xgboost.autolog(log_datasets=False, log_models=False)
 
     git_branch = get_git_branch()
 
@@ -128,45 +121,86 @@ def main():
         mlflow.log_param("balanced_data_md5", hashlib.md5(DATA_FILE.read_bytes()).hexdigest())
         mlflow.log_param("n_chunks", X.shape[0])
         mlflow.log_param("n_features", X.shape[1])
-        mlflow.log_param("test_size", params["training"]["test_size"])
-        mlflow.log_param(
-            "split_strategy", f"StratifiedGroupKFold by split_group, 1/{n_splits} test fold"
-        )
-        # Group sizes vary, so the realized fold fraction can deviate from
-        # the nominal test_size — log it for honest comparison across runs.
-        mlflow.log_param("realized_test_fraction", round(len(test_idx) / len(y), 4))
+        mlflow.log_param("test_size", training["test_size"])
         # eval_set order below drives XGBoost's auto-generated eval names,
         # which is what the per-round loss curve in MLflow gets logged under.
         mlflow.log_param("eval_set_names", "validation_0=train, validation_1=test")
         log_data_quality()
 
-        # Train model. Passing both train and test as eval_set makes XGBoost
-        # report train/test eval_metric every boosting round, which
-        # mlflow.xgboost.autolog logs as stepped metrics -> the loss curve.
-        model = xgb.XGBClassifier(
-            objective="binary:logistic",
-            random_state=params["training"]["random_state"],
-            **model_params,
+        val_per_fold, train_per_fold, test_fractions = [], [], []
+        artifact = None
+
+        for fold, train_idx, test_idx, n_splits in iter_folds(
+            X, y, groups, training["test_size"], training["n_eval_folds"]
+        ):
+            X_train, X_test = X[train_idx], X[test_idx]
+            y_train, y_test = y[train_idx], y[test_idx]
+
+            # Passing both train and test as eval_set makes XGBoost report
+            # train/test eval_metric every boosting round, which
+            # mlflow.xgboost.autolog logs as stepped metrics -> the loss curve.
+            model = xgb.XGBClassifier(
+                objective="binary:logistic",
+                random_state=training["random_state"] + fold,
+                **model_params,
+            )
+            model.fit(
+                X_train,
+                y_train,
+                eval_set=[(X_train, y_train), (X_test, y_test)],
+                verbose=False,
+            )
+
+            y_pred = model.predict(X_test)
+            y_train_pred = model.predict(X_train)
+
+            fold_val = compute_metrics(y_test, y_pred, "val")
+            fold_train = compute_metrics(y_train, y_train_pred, "train")
+            mlflow.log_metrics(
+                {f"fold{fold}_{k}": v for k, v in {**fold_val, **fold_train}.items()}
+            )
+            val_per_fold.append(fold_val)
+            train_per_fold.append(fold_train)
+            test_fractions.append(len(test_idx) / len(y))
+
+            print(
+                f"fold {fold}: val_f1={fold_val['val_f1_score']:.4f} "
+                f"({len(test_idx)} chunks)"
+            )
+
+            if fold == 0:
+                artifact = (model, y_test, y_pred)
+
+        n_evaluated = len(val_per_fold)
+        mlflow.log_param("n_eval_folds", n_evaluated)
+        mlflow.log_param(
+            "split_strategy",
+            f"StratifiedGroupKFold by split_group, {n_evaluated}/{n_splits} folds evaluated",
         )
-        model.fit(
-            X_train,
-            y_train,
-            eval_set=[(X_train, y_train), (X_test, y_test)],
-            verbose=True,
+        # Group sizes vary, so the realized fold fraction can deviate from
+        # the nominal test_size — log it for honest comparison across runs.
+        mlflow.log_param(
+            "realized_test_fraction", round(float(np.mean(test_fractions)), 4)
         )
 
-        # Evaluate and save metrics
-        y_pred = model.predict(X_test)
-        y_pred_decoded = le.inverse_transform(y_pred)
-        y_test_decoded = le.inverse_transform(y_test)
-        y_train_pred = model.predict(X_train)
+        val_summary = aggregate_fold_metrics(val_per_fold)
+        mlflow.log_metrics(val_summary)
+        mlflow.log_metrics(aggregate_fold_metrics(train_per_fold))
 
-        mlflow.log_metrics(compute_metrics(y_train, y_train_pred, "train"))
-        mlflow.log_metrics(compute_metrics(y_test, y_pred, "val"))
+        print(
+            f"val_f1 across {n_evaluated} folds: "
+            f"{val_summary['val_f1_score']:.4f} "
+            f"+/- {val_summary['val_f1_score_std']:.4f} "
+            f"(worst {val_summary['val_f1_score_min']:.4f})"
+        )
+
+        model, y_test, y_pred = artifact
 
         fig, ax = plt.subplots()
-        ConfusionMatrixDisplay.from_predictions(y_test_decoded, y_pred_decoded, ax=ax)
-        mlflow.log_figure(fig, "confusion_matrix.png")
+        ConfusionMatrixDisplay.from_predictions(
+            le.inverse_transform(y_test), le.inverse_transform(y_pred), ax=ax
+        )
+        mlflow.log_figure(fig, "confusion_matrix_fold0.png")
         plt.close(fig)
 
         # Save model

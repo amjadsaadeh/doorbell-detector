@@ -167,5 +167,92 @@ class TestHeadCompatibility(unittest.TestCase):
         self.assertIn("randomforest", str(ctx.exception))
 
 
+
+class TestIterFolds(unittest.TestCase):
+    """Cross-validation splitting. Single-fold scoring is what let every
+    variant report val F1 1.0000 on ~183 chunks."""
+
+    def setUp(self):
+        from src.splits import iter_folds
+
+        self.iter_folds = iter_folds
+        rng = np.random.default_rng(0)
+        self.n = 300
+        self.X = rng.normal(size=(self.n, 4))
+        self.y = np.tile([0, 1], self.n // 2)
+        # 30 source recordings, 10 chunks each — the leakage unit
+        self.groups = np.repeat(np.arange(30), 10)
+
+    def folds(self, test_size=0.2, n_eval_folds=None):
+        return list(self.iter_folds(self.X, self.y, self.groups, test_size, n_eval_folds))
+
+    def test_evaluates_every_fold_by_default(self):
+        folds = self.folds()
+        self.assertEqual(len(folds), 5)
+        self.assertEqual([f[0] for f in folds], [0, 1, 2, 3, 4])
+
+    def test_test_folds_are_disjoint_and_cover_the_dataset(self):
+        seen = np.concatenate([test_idx for _, _, test_idx, _ in self.folds()])
+        self.assertEqual(len(seen), len(set(seen.tolist())), "folds overlap")
+        self.assertEqual(sorted(seen.tolist()), list(range(self.n)))
+
+    def test_no_group_spans_train_and_test(self):
+        """The leakage guarantee: a recording's chunks stay on one side."""
+        for _, train_idx, test_idx, _ in self.folds():
+            self.assertFalse(
+                set(self.groups[train_idx]) & set(self.groups[test_idx])
+            )
+
+    def test_n_eval_folds_caps_without_changing_the_folds(self):
+        capped = self.folds(n_eval_folds=2)
+        self.assertEqual(len(capped), 2)
+        # the folds themselves must be identical to the first two of the full run
+        for (_, _, capped_test, _), (_, _, full_test, _) in zip(capped, self.folds()):
+            np.testing.assert_array_equal(capped_test, full_test)
+
+    def test_test_size_drives_fold_count(self):
+        self.assertEqual(len(self.folds(test_size=0.25)), 4)
+        self.assertEqual(len(self.folds(test_size=0.5)), 2)
+
+    def test_prepare_split_returns_fold_zero_by_default(self):
+        from src.splits import prepare_split
+
+        train_idx, test_idx, _ = prepare_split(self.X, self.y, self.groups, 0.2)
+        _, expected_train, expected_test, _ = self.folds()[0]
+        np.testing.assert_array_equal(train_idx, expected_train)
+        np.testing.assert_array_equal(test_idx, expected_test)
+
+    def test_prepare_split_rejects_out_of_range_fold(self):
+        from src.splits import prepare_split
+
+        with self.assertRaises(ValueError):
+            prepare_split(self.X, self.y, self.groups, 0.2, fold=99)
+
+
+class TestAggregateFoldMetrics(unittest.TestCase):
+
+    def setUp(self):
+        from src.splits import aggregate_fold_metrics
+
+        self.aggregate = aggregate_fold_metrics
+
+    def test_mean_keeps_the_plain_metric_name(self):
+        out = self.aggregate([{"val_f1_score": 1.0}, {"val_f1_score": 0.8}])
+        self.assertAlmostEqual(out["val_f1_score"], 0.9)
+
+    def test_spread_and_worst_case_are_reported(self):
+        out = self.aggregate([{"val_f1_score": 1.0}, {"val_f1_score": 0.8}])
+        self.assertAlmostEqual(out["val_f1_score_std"], 0.1)
+        self.assertAlmostEqual(out["val_f1_score_min"], 0.8)
+
+    def test_identical_folds_have_zero_spread(self):
+        out = self.aggregate([{"val_f1_score": 1.0}] * 4)
+        self.assertEqual(out["val_f1_score_std"], 0.0)
+        self.assertEqual(out["val_f1_score_min"], 1.0)
+
+    def test_empty_input_is_not_an_error(self):
+        self.assertEqual(self.aggregate([]), {})
+
+
 if __name__ == "__main__":
     unittest.main()

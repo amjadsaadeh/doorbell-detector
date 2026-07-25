@@ -36,7 +36,8 @@ import yaml
 from tensorflow import keras
 
 from paths import DATA_FILE, EXPORT_DIR
-from train_cnn import MODEL_PATH, load_dataset, prepare_split
+from splits import prepare_split
+from train_cnn import MODEL_PATH, load_dataset
 from train_xgboost import (
     MLFLOW_EXPERIMENT_NAME,
     compute_metrics,

@@ -21,11 +21,11 @@ import numpy as np
 import pandas as pd
 import yaml
 from sklearn.metrics import ConfusionMatrixDisplay
-from sklearn.model_selection import StratifiedGroupKFold
 from sklearn.preprocessing import LabelEncoder
 
 from features import get_spec
 from paths import DATA_FILE, MODEL_DIR
+from splits import aggregate_fold_metrics, iter_folds
 from train_xgboost import (
     MLFLOW_EXPERIMENT_NAME,
     compute_metrics,
@@ -68,20 +68,6 @@ def load_dataset(params: dict):
     return X, y, le, feature_type, groups
 
 
-def prepare_split(X, y, groups, test_size: float):
-    """Leakage-safe group split, shared with export_tflite.py.
-
-    Chunks are cut from heavily overlapping sliding windows and augmented
-    samples are SNR/gain variants of real chunks, so a random chunk-level
-    split leaks near-duplicates. Grouping by split_group (source recording)
-    keeps every window and synthetic variant of one recording on one side.
-    """
-    n_splits = max(2, round(1 / test_size))
-    splitter = StratifiedGroupKFold(n_splits=n_splits, shuffle=True, random_state=42)
-    train_idx, test_idx = next(splitter.split(X, y, groups))
-    return train_idx, test_idx, n_splits
-
-
 def normalization_stats(X_train: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     """Per-frequency-bin mean/std over the training set (samples x time),
     shaped for broadcasting onto (n, bins, frames, 1) batches."""
@@ -118,21 +104,9 @@ def main():
     with open("params.yaml", "r") as file:
         params = yaml.safe_load(file)
     model_params = params["model"]["cnn"]
-
-    keras.utils.set_random_seed(params["training"]["random_state"])
+    training = params["training"]
 
     X, y, le, feature_type, groups = load_dataset(params)
-
-    train_idx, test_idx, n_splits = prepare_split(
-        X, y, groups, params["training"]["test_size"]
-    )
-    X_train, X_test = X[train_idx], X[test_idx]
-    y_train, y_test = y[train_idx], y[test_idx]
-
-    # CNNs (unlike trees) need scaled inputs; stats come from train only
-    mean, std = normalization_stats(X_train)
-    X_train = (X_train - mean) / std
-    X_test = (X_test - mean) / std
 
     mlflow.set_tracking_uri(os.environ["MLFLOW_TRACKING_URI"])
     mlflow.set_experiment(MLFLOW_EXPERIMENT_NAME)
@@ -145,58 +119,116 @@ def main():
         mlflow.log_param("balanced_data_md5", hashlib.md5(DATA_FILE.read_bytes()).hexdigest())
         mlflow.log_param("n_chunks", X.shape[0])
         mlflow.log_param("input_shape", str(X.shape[1:]))
-        mlflow.log_param("test_size", params["training"]["test_size"])
-        mlflow.log_param(
-            "split_strategy", f"StratifiedGroupKFold by split_group, 1/{n_splits} test fold"
-        )
-        mlflow.log_param("realized_test_fraction", round(len(test_idx) / len(y), 4))
+        mlflow.log_param("test_size", training["test_size"])
         mlflow.log_params(model_params)
         log_data_quality()
 
-        model = build_model(X_train.shape[1:], model_params["dropout"])
-        mlflow.log_param("n_model_params", model.count_params())
-        model.compile(
-            optimizer=keras.optimizers.Adam(model_params["learning_rate"]),
-            loss="binary_crossentropy",
-            metrics=["accuracy"],
-        )
-
         # Per-epoch train/val curves, the CNN counterpart of the per-round
-        # eval_set metrics mlflow autologs for XGBoost
+        # eval_set metrics mlflow autologs for XGBoost. Only fold 0 gets one:
+        # five overlapping series on the same step axis is unreadable.
         class EpochLogger(keras.callbacks.Callback):
             def on_epoch_end(self, epoch, logs=None):
                 mlflow.log_metrics(
                     {k: float(v) for k, v in (logs or {}).items()}, step=epoch
                 )
 
-        model.fit(
-            X_train,
-            y_train,
-            validation_data=(X_test, y_test),
-            epochs=model_params["epochs"],
-            batch_size=model_params["batch_size"],
-            callbacks=[
+        val_per_fold, train_per_fold, test_fractions = [], [], []
+        artifact = None
+
+        for fold, train_idx, test_idx, n_splits in iter_folds(
+            X, y, groups, training["test_size"], training["n_eval_folds"]
+        ):
+            # Offset per fold so each fold is independently reproducible
+            # rather than every fold sharing one initialization.
+            keras.utils.set_random_seed(training["random_state"] + fold)
+
+            X_train, X_test = X[train_idx], X[test_idx]
+            y_train, y_test = y[train_idx], y[test_idx]
+
+            # CNNs (unlike trees) need scaled inputs; stats come from this
+            # fold's training portion only, never the whole dataset
+            mean, std = normalization_stats(X_train)
+            X_train = (X_train - mean) / std
+            X_test = (X_test - mean) / std
+
+            model = build_model(X_train.shape[1:], model_params["dropout"])
+            model.compile(
+                optimizer=keras.optimizers.Adam(model_params["learning_rate"]),
+                loss="binary_crossentropy",
+                metrics=["accuracy"],
+            )
+
+            callbacks = [
                 keras.callbacks.EarlyStopping(
                     monitor="val_loss",
                     patience=model_params["early_stopping_patience"],
                     restore_best_weights=True,
-                ),
-                EpochLogger(),
-            ],
-            verbose=2,
+                )
+            ]
+            if fold == 0:
+                callbacks.append(EpochLogger())
+
+            model.fit(
+                X_train,
+                y_train,
+                validation_data=(X_test, y_test),
+                epochs=model_params["epochs"],
+                batch_size=model_params["batch_size"],
+                callbacks=callbacks,
+                verbose=2,
+            )
+
+            y_pred = (model.predict(X_test, verbose=0)[:, 0] > 0.5).astype(int)
+            y_train_pred = (model.predict(X_train, verbose=0)[:, 0] > 0.5).astype(int)
+
+            fold_val = compute_metrics(y_test, y_pred, "val")
+            fold_train = compute_metrics(y_train, y_train_pred, "train")
+            mlflow.log_metrics(
+                {f"fold{fold}_{k}": v for k, v in {**fold_val, **fold_train}.items()}
+            )
+            val_per_fold.append(fold_val)
+            train_per_fold.append(fold_train)
+            test_fractions.append(len(test_idx) / len(y))
+
+            print(
+                f"fold {fold}: val_f1={fold_val['val_f1_score']:.4f} "
+                f"({len(test_idx)} chunks)"
+            )
+
+            # Fold 0's model is the deliverable; export_tflite.py re-derives
+            # fold 0 so it scores int8 against a fold this model never saw.
+            if fold == 0:
+                artifact = (model, mean, std, y_test, y_pred)
+
+        n_evaluated = len(val_per_fold)
+        mlflow.log_param("n_eval_folds", n_evaluated)
+        mlflow.log_param("n_model_params", artifact[0].count_params())
+        mlflow.log_param(
+            "split_strategy",
+            f"StratifiedGroupKFold by split_group, {n_evaluated}/{n_splits} folds evaluated",
+        )
+        mlflow.log_param(
+            "realized_test_fraction", round(float(np.mean(test_fractions)), 4)
         )
 
-        y_pred = (model.predict(X_test, verbose=0)[:, 0] > 0.5).astype(int)
-        y_train_pred = (model.predict(X_train, verbose=0)[:, 0] > 0.5).astype(int)
+        val_summary = aggregate_fold_metrics(val_per_fold)
+        mlflow.log_metrics(val_summary)
+        mlflow.log_metrics(aggregate_fold_metrics(train_per_fold))
 
-        mlflow.log_metrics(compute_metrics(y_train, y_train_pred, "train"))
-        mlflow.log_metrics(compute_metrics(y_test, y_pred, "val"))
+        print(
+            f"val_f1 across {n_evaluated} folds: "
+            f"{val_summary['val_f1_score']:.4f} "
+            f"+/- {val_summary['val_f1_score_std']:.4f} "
+            f"(worst {val_summary['val_f1_score_min']:.4f})"
+        )
+
+        model, mean, std, y_test, y_pred = artifact
 
         fig, ax = plt.subplots()
         ConfusionMatrixDisplay.from_predictions(
             le.inverse_transform(y_test), le.inverse_transform(y_pred), ax=ax
         )
-        mlflow.log_figure(fig, "confusion_matrix.png")
+        mlflow.log_figure(fig, "confusion_matrix_fold0.png")
         plt.close(fig)
 
         MODEL_PATH.parent.mkdir(parents=True, exist_ok=True)

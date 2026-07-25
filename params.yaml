@@ -83,8 +83,14 @@ feature_extraction:
 
 training:
   test_size: 0.2
-  # Seed for the split, and for whichever head trains on it
+  # Seed for the split, and for whichever head trains on it (offset per
+  # fold, so each fold is independently reproducible)
   random_state: 42
+  # How many CV folds to actually train and score. null = all of them
+  # (1/test_size), which is what makes val_f1_score a mean with a _std
+  # rather than one lucky split. Set to 1 for a fast iteration loop --
+  # it reproduces the old single-fold behaviour, at the old credibility.
+  n_eval_folds: null
   # Which model family trains on the chunks: `cnn` (src/train_cnn.py) keeps
   # the 2D (bins, frames) structure, `xgboost` (src/train_xgboost.py)
   # flattens it. yamnet features only work with the xgboost head — its

@@ -196,16 +196,16 @@ stages:
       size: 564
     - path: src/train_cnn.py
       hash: md5
-      md5: 93195cd5512128e72a582fbd70b68b64
-      size: 8084
+      md5: 348a4912b1b213ff07bcb9a14603770f
+      size: 9364
     - path: src/train_model.py
       hash: md5
       md5: 7afe6fd0ee2852f8e4ac8f3118715f1c
       size: 1653
     - path: src/train_xgboost.py
       hash: md5
-      md5: fa3b01a0c22acf12898b85b7a52ae6fd
-      size: 7042
+      md5: 526d2db35cf13f1609b2ddb624c6ad59
+      size: 8001
     params:
       params.yaml:
         model:
@@ -225,11 +225,12 @@ stages:
         training:
           test_size: 0.2
           random_state: 42
+          n_eval_folds:
           head: cnn
     outs:
     - path: models/trained
       hash: md5
-      md5: 0a48e2bc88af8d6fc233485833947a93.dir
+      md5: 26afc24c02fff25a639f0b2bbfa35edc.dir
       size: 215369
       nfiles: 2
   draw_data:
@@ -452,25 +453,25 @@ stages:
       size: 29667272
     - path: models/trained
       hash: md5
-      md5: 0a48e2bc88af8d6fc233485833947a93.dir
+      md5: 26afc24c02fff25a639f0b2bbfa35edc.dir
       size: 215369
       nfiles: 2
     - path: src/export_tflite.py
       hash: md5
-      md5: b3a0301d43a08f3f7b02acba1c96f54a
-      size: 11555
+      md5: 9e5294f2c0dcac2e3a9c255cd4a98b71
+      size: 11573
     - path: src/paths.py
       hash: md5
       md5: a03368e21b3148e0cd1a65b4c5c234da
       size: 564
     - path: src/train_cnn.py
       hash: md5
-      md5: 93195cd5512128e72a582fbd70b68b64
-      size: 8084
+      md5: 348a4912b1b213ff07bcb9a14603770f
+      size: 9364
     - path: src/train_xgboost.py
       hash: md5
-      md5: fa3b01a0c22acf12898b85b7a52ae6fd
-      size: 7042
+      md5: 526d2db35cf13f1609b2ddb624c6ad59
+      size: 8001
     params:
       params.yaml:
         export:
@@ -485,14 +486,15 @@ stages:
         training:
           test_size: 0.2
           random_state: 42
+          n_eval_folds:
           head: cnn
     outs:
     - path: models/export
       hash: md5
-      md5: c1494e04676398f66ad3393214df9e45.dir
+      md5: 0e4099f440ceebdc1f1c812893040892.dir
       size: 197687
       nfiles: 3
     - path: models/tflite_metrics.json
       hash: md5
-      md5: c25cb6c5fdc5516af73863ecde7c9d7a
+      md5: 8ae1a58ab73838323c8e6edd8f73395e
       size: 582

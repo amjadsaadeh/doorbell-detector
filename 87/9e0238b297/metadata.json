@@ -1,0 +1,38 @@
+{
+  "cli_version": "0.8.42",
+  "checkpoint_id": "879e0238b297",
+  "strategy": "manual-commit",
+  "branch": "unified-pipeline",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "CLAUDE.md",
+    "dvc.yaml",
+    "params.yaml",
+    "src/audio_sources.py",
+    "src/draw_data.py",
+    "src/export_tflite.py",
+    "src/extract_features.py",
+    "src/features.py",
+    "src/paths.py",
+    "src/select_chunks.py",
+    "src/train_model.py",
+    "tests/features_test.py",
+    "tests/select_chunks_test.py"
+  ],
+  "sessions": [
+    {
+      "metadata": "/87/9e0238b297/0/metadata.json",
+      "transcript": "/87/9e0238b297/0/full.jsonl",
+      "compact_transcript": "/87/9e0238b297/0/transcript.jsonl",
+      "content_hash": "/87/9e0238b297/0/content_hash.txt",
+      "prompt": "/87/9e0238b297/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 105,
+    "cache_creation_tokens": 166567,
+    "cache_read_tokens": 6284306,
+    "output_tokens": 70435,
+    "api_call_count": 54
+  }
+}

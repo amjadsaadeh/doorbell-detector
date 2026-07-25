@@ -1,0 +1,87 @@
+{
+  "cli_version": "0.8.42",
+  "checkpoint_id": "4d6f943ab50b",
+  "session_id": "b8ba1f78-979a-4187-b0de-3af3acf4920c",
+  "strategy": "manual-commit",
+  "created_at": "2026-07-25T20:20:35.316997642Z",
+  "branch": "unified-pipeline",
+  "checkpoints_count": 5,
+  "save_step_count": 2,
+  "files_touched": [
+    "params.yaml",
+    "src/export_tflite.py",
+    "src/splits.py",
+    "src/train_cnn.py",
+    "src/train_xgboost.py",
+    "tests/select_chunks_test.py"
+  ],
+  "agent": "Claude Code",
+  "model": "",
+  "turn_id": "252d98b30fb9",
+  "checkpoint_transcript_start": 623,
+  "transcript_lines_at_start": 623,
+  "compact_transcript_start": 149,
+  "token_usage": {
+    "input_tokens": 53,
+    "cache_creation_tokens": 47641,
+    "cache_read_tokens": 8764117,
+    "output_tokens": 26494,
+    "api_call_count": 29
+  },
+  "session_metrics": {
+    "turn_count": 12
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-07-25T20:20:35.177958664Z",
+    "agent_lines": 315,
+    "agent_removed": 102,
+    "human_added": 18,
+    "human_modified": 16,
+    "human_removed": 0,
+    "total_committed": 349,
+    "total_lines_changed": 473,
+    "agent_percentage": 88.16067653276956,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 21,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        ".claude/scheduled_tasks.lock": 1,
+        ".claude/settings.local.json": 20
+      }
+    },
+    {
+      "checkpoint_number": 2,
+      "user_lines_added": 21,
+      "user_lines_removed": 0,
+      "agent_lines_added": 331,
+      "agent_lines_removed": 102,
+      "user_added_per_file": {
+        ".claude/scheduled_tasks.lock": 1,
+        ".claude/settings.local.json": 20
+      }
+    },
+    {
+      "checkpoint_number": 3,
+      "user_lines_added": 39,
+      "user_lines_removed": 16,
+      "agent_lines_added": 331,
+      "agent_lines_removed": 102,
+      "user_added_per_file": {
+        ".claude/scheduled_tasks.lock": 1,
+        ".claude/settings.local.json": 20,
+        "dvc.lock": 16,
+        "models/tflite_metrics.json": 2
+      },
+      "user_removed_per_file": {
+        "dvc.lock": 14,
+        "models/tflite_metrics.json": 2
+      }
+    }
+  ]
+}

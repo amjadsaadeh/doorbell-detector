@@ -1,0 +1,1 @@
+so how to I Run teh Trainings right now? how do i decise which model to train?

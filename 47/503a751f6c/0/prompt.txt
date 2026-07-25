@@ -1,0 +1,1 @@
+create a new branch to check the performance of logmel features. use frist the currenr setup then use 40 mel coeffs

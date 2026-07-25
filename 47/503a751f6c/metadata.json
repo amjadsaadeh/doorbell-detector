@@ -1,0 +1,31 @@
+{
+  "cli_version": "0.8.42",
+  "checkpoint_id": "47503a751f6c",
+  "strategy": "manual-commit",
+  "branch": "cnn-logmel",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "data/.gitignore",
+    "dvc.yaml",
+    "params.yaml",
+    "src/draw_data.py",
+    "src/extract_logmel_features.py",
+    "tests/logmel_extraction_test.py"
+  ],
+  "sessions": [
+    {
+      "metadata": "/47/503a751f6c/0/metadata.json",
+      "transcript": "/47/503a751f6c/0/full.jsonl",
+      "compact_transcript": "/47/503a751f6c/0/transcript.jsonl",
+      "content_hash": "/47/503a751f6c/0/content_hash.txt",
+      "prompt": "/47/503a751f6c/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 53,
+    "cache_creation_tokens": 63841,
+    "cache_read_tokens": 1653326,
+    "output_tokens": 16632,
+    "api_call_count": 28
+  }
+}

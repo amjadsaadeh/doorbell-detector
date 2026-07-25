@@ -1,0 +1,74 @@
+{
+  "cli_version": "0.8.42",
+  "checkpoint_id": "47503a751f6c",
+  "session_id": "5dd7f86e-1d0d-4787-8f94-7c8082485514",
+  "strategy": "manual-commit",
+  "created_at": "2026-07-25T17:16:12.397797253Z",
+  "branch": "cnn-logmel",
+  "checkpoints_count": 1,
+  "save_step_count": 1,
+  "files_touched": [
+    "data/.gitignore",
+    "dvc.yaml",
+    "params.yaml",
+    "src/draw_data.py",
+    "src/extract_logmel_features.py",
+    "tests/logmel_extraction_test.py"
+  ],
+  "agent": "Claude Code",
+  "model": "",
+  "turn_id": "f23d7d60bb2c",
+  "compact_transcript_start": 0,
+  "token_usage": {
+    "input_tokens": 53,
+    "cache_creation_tokens": 63841,
+    "cache_read_tokens": 1653326,
+    "output_tokens": 16632,
+    "api_call_count": 28
+  },
+  "session_metrics": {
+    "turn_count": 1
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-07-25T17:16:12.37252874Z",
+    "agent_lines": 223,
+    "agent_removed": 25,
+    "human_added": 15,
+    "human_modified": 15,
+    "human_removed": 0,
+    "total_committed": 253,
+    "total_lines_changed": 293,
+    "agent_percentage": 84.64163822525597,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 2280,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        ".claude/scheduled_tasks.lock": 1,
+        ".claude/settings.local.json": 20,
+        "models/doorbell_model_data.cc": 2250,
+        "models/doorbell_model_data.h": 9
+      }
+    },
+    {
+      "checkpoint_number": 2,
+      "user_lines_added": 51,
+      "user_lines_removed": 15,
+      "agent_lines_added": 2497,
+      "agent_lines_removed": 25,
+      "user_added_per_file": {
+        ".claude/scheduled_tasks.lock": 1,
+        ".claude/settings.local.json": 20,
+        "dvc.lock": 30
+      },
+      "user_removed_per_file": {
+        "dvc.lock": 15
+      }
+    }
+  ]
+}

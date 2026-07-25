@@ -66,17 +66,18 @@ stages:
     - data/augmented_annotations.csv
 
   extract_features:
-    cmd: python src/extract_stft_features.py
+    cmd: python src/extract_logmel_features.py
     deps:
     - data/audio
     - data/augmented_audio
     - data/noise/esc50
     - data/noise/demand
-    - src/extract_stft_features.py
+    - src/extract_logmel_features.py
     params:
     - augmentation.external_noise_pools
+    - feature_extraction
     outs:
-    - data/stft_data/
+    - data/logmel_data/
 
   draw_data:
     cmd: python src/draw_data.py
@@ -86,10 +87,11 @@ stages:
     - chunk_size
     - chunk_overlap
     - augmentation.external_noise_pools
+    - feature_extraction
     deps:
     - data/annotation_per_row_data.csv
     - data/augmented_annotations.csv
-    - data/stft_data/
+    - data/logmel_data/
     - data/noise/esc50
     - data/noise/demand
     - src/draw_data.py
@@ -114,6 +116,28 @@ stages:
     outs:
     - models/cnn_model.keras
     - models/cnn_normalization.npz
+
+  export_model:
+    cmd: python src/export_tflite.py
+    deps:
+    - data/balanced_data.h5
+    - models/cnn_model.keras
+    - models/cnn_normalization.npz
+    - src/export_tflite.py
+    - src/train_cnn.py
+    - src/train_xgboost.py
+    params:
+    - export
+    - model.log_compress
+    - model.random_state
+    - training
+    outs:
+    - models/doorbell_int8.tflite
+    - models/doorbell_model_data.cc
+    - models/doorbell_model_data.h
+    metrics:
+    - models/tflite_metrics.json:
+        cache: false
 
 metrics:
 - data/data_quality/sample_based_quality.json

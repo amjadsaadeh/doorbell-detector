@@ -1,5 +1,20 @@
 chunk_size: 2000 # ms
 chunk_overlap: 250 #ms
+
+# Feature representation. This branch targets ESP32-S3 inference, so the
+# geometry is chosen for MCU memory rather than accuracy alone: the first conv
+# activation (n_mels x n_frames x 32) is what has to fit in SRAM, and 40x100
+# lands at ~125 KB int8 (internal SRAM) vs ~1 MB for the 129x250 STFT branch.
+# hop_length 320 = 20 ms, so a 2000 ms chunk is exactly 100 frames.
+feature_extraction:
+  type: logmel
+  features_dir: ./data/logmel_data
+  n_mels: 40
+  n_fft: 512 # 32 ms @ 16 kHz
+  hop_length: 320 # 20 ms
+  fmin: 50
+  fmax: 8000
+  log_offset: 1.0e-6
 inbalance_ratio: 1.0 # How much more background samples should be drawn
 # Share of the drawn background chunks that comes from the external noise
 # pools instead of the labeled recordings. If one source can't fill its
@@ -46,6 +61,18 @@ model:
   early_stopping_patience: 10
   dropout: 0.3
   # Raw STFT magnitudes span orders of magnitude — log-compress them before
-  # normalization (see train_cnn.py); MFCC branches set this to false
-  log_compress: true
+  # normalization (see train_cnn.py); MFCC branches set this to false.
+  # This branch also sets false: extract_logmel_features.py already applies
+  # the log, so the .npy files are exactly what the firmware C frontend must
+  # reproduce (single artifact to compare for train/serve parity).
+  log_compress: false
   random_state: 42
+
+# int8 TFLite export for the ESP32-S3 (Phase 2)
+export:
+  # Chunks drawn from the training fold to calibrate activation ranges
+  representative_samples: 500
+  # Hard gate: fail the export if int8 quantization costs more val F1 than
+  # this. Silent quantization collapse is the most likely way this branch
+  # produces a model that looks fine offline and does not work on device.
+  max_f1_drop: 0.01

@@ -59,6 +59,10 @@ def compute_metrics(y_true, y_pred, prefix):
         f"{prefix}_f1_score": report["weighted avg"]["f1-score"],
         f"{prefix}_recall": report["weighted avg"]["recall"],
         f"{prefix}_precision": report["weighted avg"]["precision"],
+        # Logged explicitly because Keras' own val_accuracy comes from the
+        # *last* epoch while these come from the restored best weights, so
+        # the two disagree in MLflow (see EpochLogger in train_cnn.py).
+        f"{prefix}_accuracy": report["accuracy"],
     }
 
 

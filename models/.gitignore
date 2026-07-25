@@ -1,3 +1,6 @@
 /xgboost_model.json
 /cnn_model.keras
 /cnn_normalization.npz
+/doorbell_int8.tflite
+/doorbell_model_data.cc
+/doorbell_model_data.h

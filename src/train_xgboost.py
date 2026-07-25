@@ -15,11 +15,9 @@ from sklearn.metrics import ConfusionMatrixDisplay, classification_report
 from sklearn.model_selection import StratifiedGroupKFold
 from sklearn.preprocessing import LabelEncoder
 
+from paths import DATA_FILE, DATA_QUALITY_DIR, MODEL_DIR
+
 MLFLOW_EXPERIMENT_NAME = "doorbell-detector"
-
-DATA_FILE = Path("./data/balanced_data.h5")
-
-DATA_QUALITY_DIR = Path("./data/data_quality")
 # (json file, metric prefix) pairs produced by extract_data_quality.py (raw,
 # pre-chunking annotations) and draw_data.py (post-chunking/balancing) —
 # logged to MLflow so quality of the data feeding a run is tied to its
@@ -59,6 +57,10 @@ def compute_metrics(y_true, y_pred, prefix):
         f"{prefix}_f1_score": report["weighted avg"]["f1-score"],
         f"{prefix}_recall": report["weighted avg"]["recall"],
         f"{prefix}_precision": report["weighted avg"]["precision"],
+        # Logged explicitly because Keras' own val_accuracy comes from the
+        # *last* epoch while these come from the restored best weights, so
+        # the two disagree in MLflow (see EpochLogger in train_cnn.py).
+        f"{prefix}_accuracy": report["accuracy"],
     }
 
 
@@ -164,9 +166,10 @@ def main():
         plt.close(fig)
 
         # Save model
-        model_path = Path("./models/xgboost_model.json")
-        model_path.parent.mkdir(exist_ok=True)
+        model_path = MODEL_DIR / "xgboost_model.json"
+        model_path.parent.mkdir(parents=True, exist_ok=True)
         model.save_model(model_path)
+        mlflow.log_artifact(model_path)
 
 
 if __name__ == "__main__":

@@ -24,15 +24,15 @@ from sklearn.metrics import ConfusionMatrixDisplay
 from sklearn.model_selection import StratifiedGroupKFold
 from sklearn.preprocessing import LabelEncoder
 
+from paths import DATA_FILE, MODEL_DIR
 from train_xgboost import (
-    DATA_FILE,
     MLFLOW_EXPERIMENT_NAME,
     compute_metrics,
     get_git_branch,
     log_data_quality,
 )
 
-MODEL_PATH = Path("./models/cnn_model.keras")
+MODEL_PATH = MODEL_DIR / "cnn_model.keras"
 
 
 def prepare_data(df: pd.DataFrame):
@@ -47,6 +47,39 @@ def prepare_data(df: pd.DataFrame):
     )
     y = le.fit_transform(df["label"])
     return X, y, le, feature_col.removesuffix("_features")
+
+
+def load_dataset(params: dict):
+    """Load balanced_data.h5 and apply the branch's log-compression setting.
+
+    Shared with export_tflite.py so the exported model is calibrated and
+    scored on exactly the tensors it was trained on.
+    """
+    df = pd.read_hdf(DATA_FILE, key="data")
+    X, y, le, feature_type = prepare_data(df)
+
+    # Raw STFT magnitudes span orders of magnitude; log-compression makes
+    # them tractable for a CNN. MFCC and log-mel branches are already in the
+    # log domain (the extractor does it), so they set this false.
+    if params["model"]["log_compress"]:
+        X = np.log(X + 1e-6)
+
+    groups = df["split_group"].to_numpy()
+    return X, y, le, feature_type, groups
+
+
+def prepare_split(X, y, groups, test_size: float):
+    """Leakage-safe group split, shared with export_tflite.py.
+
+    Chunks are cut from heavily overlapping sliding windows and augmented
+    samples are SNR/gain variants of real chunks, so a random chunk-level
+    split leaks near-duplicates. Grouping by split_group (source recording)
+    keeps every window and synthetic variant of one recording on one side.
+    """
+    n_splits = max(2, round(1 / test_size))
+    splitter = StratifiedGroupKFold(n_splits=n_splits, shuffle=True, random_state=42)
+    train_idx, test_idx = next(splitter.split(X, y, groups))
+    return train_idx, test_idx, n_splits
 
 
 def normalization_stats(X_train: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
@@ -88,19 +121,11 @@ def main():
 
     keras.utils.set_random_seed(model_params["random_state"])
 
-    df = pd.read_hdf(DATA_FILE, key="data")
-    X, y, le, feature_type = prepare_data(df)
+    X, y, le, feature_type, groups = load_dataset(params)
 
-    # Raw STFT magnitudes span orders of magnitude; log-compression makes
-    # them tractable for a CNN. MFCCs are already log-domain (branch config).
-    if model_params["log_compress"]:
-        X = np.log(X + 1e-6)
-
-    # Same leakage-safe group split as train_xgboost.py (see comment there)
-    groups = df["split_group"].to_numpy()
-    n_splits = max(2, round(1 / params["training"]["test_size"]))
-    splitter = StratifiedGroupKFold(n_splits=n_splits, shuffle=True, random_state=42)
-    train_idx, test_idx = next(splitter.split(X, y, groups))
+    train_idx, test_idx, n_splits = prepare_split(
+        X, y, groups, params["training"]["test_size"]
+    )
     X_train, X_test = X[train_idx], X[test_idx]
     y_train, y_test = y[train_idx], y[test_idx]
 
@@ -174,7 +199,7 @@ def main():
         mlflow.log_figure(fig, "confusion_matrix.png")
         plt.close(fig)
 
-        MODEL_PATH.parent.mkdir(exist_ok=True)
+        MODEL_PATH.parent.mkdir(parents=True, exist_ok=True)
         model.save(MODEL_PATH)
         mlflow.log_artifact(MODEL_PATH)
         # Inference needs the same normalization; keep the stats next to the

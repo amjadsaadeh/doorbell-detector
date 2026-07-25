@@ -1,0 +1,294 @@
+"""Export the trained CNN as a full-integer int8 TFLite model for the ESP32-S3.
+
+Two things make this more than a format conversion:
+
+1. **Normalization is baked into the graph.** train_cnn.py stores per-mel-bin
+   mean/std in cnn_normalization.npz and applies them outside the model. Here
+   they become a Rescaling layer in front of the trained network, so the
+   firmware's C frontend only has to produce log-mel energies -- everything
+   after that is the interpreter's job. One less place for train/serve skew.
+
+2. **The export is gated on int8 val F1.** Full-integer post-training
+   quantization can quietly destroy a model that looks fine in float. The
+   stage recomputes the same leakage-safe split train_cnn.py used, scores the
+   int8 interpreter on the val fold, and fails if F1 drops by more than
+   export.max_f1_drop.
+
+Outputs models/export/doorbell_int8.tflite (for reference/testing), the
+equivalent C array in models/export/doorbell_model_data.cc (compiled into
+the firmware), and models/tflite_metrics.json.
+
+The stage runs for every variant in the default DAG, so representations are
+ranked on their post-quantization score rather than their float32 one. Heads
+that produce nothing convertible record a skip marker instead (see skip()).
+"""
+
+import hashlib
+import json
+import os
+import shutil
+from pathlib import Path
+
+import mlflow
+import numpy as np
+import tensorflow as tf
+import yaml
+from tensorflow import keras
+
+from paths import DATA_FILE, EXPORT_DIR
+from train_cnn import MODEL_PATH, load_dataset, prepare_split
+from train_xgboost import (
+    MLFLOW_EXPERIMENT_NAME,
+    compute_metrics,
+    get_git_branch,
+)
+
+NORMALIZATION_PATH = MODEL_PATH.with_name("cnn_normalization.npz")
+TFLITE_PATH = EXPORT_DIR / "doorbell_int8.tflite"
+C_ARRAY_PATH = EXPORT_DIR / "doorbell_model_data.cc"
+# Outside EXPORT_DIR: it is a dvc metrics file (cache: false), and it is
+# written on the skip path too, where EXPORT_DIR holds no model at all.
+METRICS_PATH = Path("./models/tflite_metrics.json")
+
+C_ARRAY_VAR = "g_doorbell_model_data"
+
+
+def build_export_model(trained: keras.Model, mean: np.ndarray, std: np.ndarray):
+    """Prepend per-bin normalization so the graph consumes raw log-mel.
+
+    mean/std come from normalization_stats() with shape (n_bins, 1, 1), which
+    broadcasts over the (batch, n_bins, n_frames, 1) input.
+    """
+    inputs = keras.Input(shape=trained.input_shape[1:], name="logmel")
+    x = keras.layers.Rescaling(
+        scale=(1.0 / std).astype(np.float32),
+        offset=(-mean / std).astype(np.float32),
+        name="normalize",
+    )(inputs)
+    outputs = trained(x)
+    return keras.Model(inputs, outputs, name="doorbell_int8_export")
+
+
+def convert_int8(model: keras.Model, representative: np.ndarray) -> bytes:
+    """Full-integer PTQ. int8 in and out so no float ops remain for TFLM."""
+    converter = tf.lite.TFLiteConverter.from_keras_model(model)
+    converter.optimizations = [tf.lite.Optimize.DEFAULT]
+    converter.target_spec.supported_ops = [tf.lite.OpsSet.TFLITE_BUILTINS_INT8]
+    converter.inference_input_type = tf.int8
+    converter.inference_output_type = tf.int8
+
+    def representative_dataset():
+        for sample in representative:
+            yield [sample[np.newaxis, ...].astype(np.float32)]
+
+    converter.representative_dataset = representative_dataset
+    return converter.convert()
+
+
+def tflite_predict(tflite_model: bytes, X: np.ndarray) -> np.ndarray:
+    """Run the int8 interpreter sample by sample, returning float scores."""
+    interpreter = tf.lite.Interpreter(model_content=tflite_model)
+    interpreter.allocate_tensors()
+    inp = interpreter.get_input_details()[0]
+    out = interpreter.get_output_details()[0]
+
+    in_scale, in_zero = inp["quantization"]
+    out_scale, out_zero = out["quantization"]
+
+    scores = np.empty(len(X), dtype=np.float32)
+    for i, sample in enumerate(X):
+        quantized = np.clip(
+            np.round(sample / in_scale + in_zero), -128, 127
+        ).astype(np.int8)
+        interpreter.set_tensor(inp["index"], quantized[np.newaxis, ...])
+        interpreter.invoke()
+        raw = interpreter.get_tensor(out["index"])[0, 0]
+        scores[i] = (float(raw) - out_zero) * out_scale
+    return scores
+
+
+def largest_activation_bytes(tflite_model: bytes) -> int:
+    """Biggest intermediate tensor, as an int8 arena sanity check.
+
+    Not the arena size itself -- TFLM's real requirement depends on its
+    allocation planner and has to be confirmed on device -- but this is the
+    number that decides internal SRAM vs PSRAM.
+    """
+    interpreter = tf.lite.Interpreter(model_content=tflite_model)
+    interpreter.allocate_tensors()
+    return max(
+        int(np.prod(d["shape"])) * np.dtype(d["dtype"]).itemsize
+        for d in interpreter.get_tensor_details()
+        if len(d["shape"]) > 0
+    )
+
+
+def write_c_array(data: bytes, path: Path, var_name: str) -> None:
+    """Emit an xxd-style C array plus its header, for the firmware build.
+
+    The array is 16-byte aligned because TFLM requires the flatbuffer to be
+    aligned before it will parse it in place.
+    """
+    lines = [
+        "// Generated by src/export_tflite.py -- do not edit.",
+        "//",
+        f"// int8 doorbell classifier, {len(data)} bytes.",
+        "",
+        f'#include "{path.with_suffix(".h").name}"',
+        "",
+        f"alignas(16) const unsigned char {var_name}[] = {{",
+    ]
+    for offset in range(0, len(data), 12):
+        chunk = ", ".join(f"0x{byte:02x}" for byte in data[offset : offset + 12])
+        lines.append(f"    {chunk},")
+    lines.append("};")
+    lines.append(f"const unsigned int {var_name}_len = {len(data)};")
+    lines.append("")
+    path.write_text("\n".join(lines))
+
+    guard = path.with_suffix(".h").name.upper().replace(".", "_") + "_"
+    path.with_suffix(".h").write_text(
+        "\n".join(
+            [
+                "// Generated by src/export_tflite.py -- do not edit.",
+                "",
+                f"#ifndef {guard}",
+                f"#define {guard}",
+                "",
+                f"extern const unsigned char {var_name}[];",
+                f"extern const unsigned int {var_name}_len;",
+                "",
+                f"#endif  // {guard}",
+                "",
+            ]
+        )
+    )
+
+
+def skip(reason: str) -> None:
+    """Leave the declared outputs in a valid, self-explaining state.
+
+    The stage is part of the default DAG so that every candidate model is
+    scored after quantization, not before -- a variant that wins in float32
+    and collapses in int8 is the wrong winner. But only the CNN head
+    produces something convertible, so non-CNN runs record why there is no
+    model here rather than failing the pipeline.
+    """
+    EXPORT_DIR.mkdir(parents=True, exist_ok=True)
+    (EXPORT_DIR / "SKIPPED.json").write_text(
+        json.dumps({"skipped": True, "reason": reason}, indent=4)
+    )
+    METRICS_PATH.parent.mkdir(parents=True, exist_ok=True)
+    METRICS_PATH.write_text(json.dumps({"skipped": 1}, indent=4))
+    print(f"export skipped: {reason}")
+
+
+def main():
+    with open("params.yaml", "r") as file:
+        params = yaml.safe_load(file)
+    export_params = params["export"]
+
+    if EXPORT_DIR.exists():
+        shutil.rmtree(EXPORT_DIR)
+
+    head = params["training"]["head"]
+    if head != "cnn":
+        skip(f"training.head is {head!r}; int8 TFLite export needs the cnn head")
+        return
+
+    # load_dataset -> prepare_data already appends the channel axis, so X is
+    # (n, n_mels, n_frames, 1) here.
+    X, y, le, feature_type, groups = load_dataset(params)
+    train_idx, test_idx, _ = prepare_split(
+        X, y, groups, params["training"]["test_size"]
+    )
+    X_train, X_test = X[train_idx], X[test_idx]
+    y_train, y_test = y[train_idx], y[test_idx]
+
+    trained = keras.models.load_model(MODEL_PATH)
+    stats = np.load(NORMALIZATION_PATH)
+    mean, std = stats["mean"], stats["std"]
+
+    export_model = build_export_model(trained, mean, std)
+
+    # Float reference on the same fold, through the same wrapped graph, so
+    # the delta measures quantization only.
+    float_scores = export_model.predict(X_test, verbose=0)[:, 0]
+    float_pred = (float_scores > 0.5).astype(int)
+    float_metrics = compute_metrics(y_test, float_pred, "float_val")
+
+    rng = np.random.default_rng(params["model"]["random_state"])
+    n_rep = min(export_params["representative_samples"], len(X_train))
+    representative = X_train[rng.choice(len(X_train), n_rep, replace=False)]
+
+    tflite_model = convert_int8(export_model, representative)
+
+    int8_scores = tflite_predict(tflite_model, X_test)
+    int8_pred = (int8_scores > 0.5).astype(int)
+    int8_metrics = compute_metrics(y_test, int8_pred, "int8_val")
+
+    float_f1 = float_metrics["float_val_f1_score"]
+    int8_f1 = int8_metrics["int8_val_f1_score"]
+    f1_drop = float_f1 - int8_f1
+    agreement = float((float_pred == int8_pred).mean())
+    peak_activation = largest_activation_bytes(tflite_model)
+
+    # F1 and label agreement both saturate at 1.0 on a val fold this small,
+    # which makes them blind to quantization damage that has not yet flipped
+    # a label. The raw sigmoid deviation does not saturate, so it is the
+    # metric that will actually move first if a future retrain degrades.
+    score_deviation = np.abs(float_scores - int8_scores)
+    max_score_deviation = float(score_deviation.max())
+    mean_score_deviation = float(score_deviation.mean())
+
+    TFLITE_PATH.parent.mkdir(parents=True, exist_ok=True)
+    TFLITE_PATH.write_bytes(tflite_model)
+    write_c_array(tflite_model, C_ARRAY_PATH, C_ARRAY_VAR)
+
+    metrics = {
+        **float_metrics,
+        **int8_metrics,
+        "f1_drop": f1_drop,
+        "float_int8_agreement": agreement,
+        "max_score_deviation": max_score_deviation,
+        "mean_score_deviation": mean_score_deviation,
+        "val_chunks": int(len(y_test)),
+        "tflite_bytes": len(tflite_model),
+        "peak_activation_bytes": peak_activation,
+        "representative_samples": n_rep,
+        "input_shape": list(X.shape[1:]),
+    }
+    METRICS_PATH.write_text(json.dumps(metrics, indent=4))
+
+    mlflow.set_tracking_uri(os.environ["MLFLOW_TRACKING_URI"])
+    mlflow.set_experiment(MLFLOW_EXPERIMENT_NAME)
+    git_branch = get_git_branch()
+    with mlflow.start_run(run_name=f"tflite-int8-{feature_type}-{git_branch}"):
+        mlflow.set_tag("git_branch", git_branch)
+        mlflow.log_param("feature_type", feature_type)
+        mlflow.log_param(
+            "balanced_data_md5", hashlib.md5(DATA_FILE.read_bytes()).hexdigest()
+        )
+        mlflow.log_params(export_params)
+        mlflow.log_param("input_shape", str(X.shape[1:]))
+        mlflow.log_metrics({k: v for k, v in metrics.items() if isinstance(v, (int, float))})
+        mlflow.log_artifact(TFLITE_PATH)
+        mlflow.log_artifact(METRICS_PATH)
+
+    print(f"val chunks    : {len(y_test)}")
+    print(f"float val F1  : {float_f1:.4f}")
+    print(f"int8  val F1  : {int8_f1:.4f}  (drop {f1_drop:+.4f})")
+    print(f"label agree   : {agreement:.4f}")
+    print(f"score dev     : max {max_score_deviation:.4f}  mean {mean_score_deviation:.4f}")
+    print(f"tflite size   : {len(tflite_model) / 1024:.1f} KB")
+    print(f"peak tensor   : {peak_activation / 1024:.1f} KB")
+
+    if f1_drop > export_params["max_f1_drop"]:
+        raise SystemExit(
+            f"int8 quantization cost {f1_drop:.4f} val F1, limit is "
+            f"{export_params['max_f1_drop']:.4f}. Model not fit for deployment."
+        )
+
+
+if __name__ == "__main__":
+    main()

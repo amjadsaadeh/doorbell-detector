@@ -1,0 +1,23 @@
+{
+    "float_val_f1_score": 1.0,
+    "float_val_recall": 1.0,
+    "float_val_precision": 1.0,
+    "float_val_accuracy": 1.0,
+    "int8_val_f1_score": 1.0,
+    "int8_val_recall": 1.0,
+    "int8_val_precision": 1.0,
+    "int8_val_accuracy": 1.0,
+    "f1_drop": 0.0,
+    "float_int8_agreement": 1.0,
+    "max_score_deviation": 0.014075100421905518,
+    "mean_score_deviation": 0.0008247102377936244,
+    "val_chunks": 183,
+    "tflite_bytes": 26888,
+    "peak_activation_bytes": 128000,
+    "representative_samples": 500,
+    "input_shape": [
+        40,
+        100,
+        1
+    ]
+}

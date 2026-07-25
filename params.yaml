@@ -19,7 +19,14 @@ augmentation:
   # classes staying excluded (see noise_pools.esc50): with those in the
   # pool, a noise-dominated mix labeled front_doorbell would teach the
   # model that any bell is the doorbell.
-  snrs_db: [-15, -10, -5, 0, 5, 10, 15]
+  snrs_db:
+  - -15
+  - -10
+  - -5
+  - 0
+  - 5
+  - 10
+  - 15
   # How many random noise chunks to pair with each real doorbell chunk, per SNR
   pairs_per_signal_chunk: 2
   # Uniform loudness jitter (+/- dB) applied to each mixed sample so synthetic
@@ -29,39 +36,58 @@ augmentation:
   # pool is chosen uniformly first, then a window within it, so the small
   # labeled-background pool isn't drowned out by these much larger ones.
   external_noise_pools:
-    - data/noise/esc50
-    - data/noise/demand
-
+  - data/noise/esc50
+  - data/noise/demand
 noise_pools:
   esc50:
     # Bell-like classes are excluded: at the low end of the SNR sweep the
     # noise dominates the mixture, and a mostly-bell sample labeled
     # front_doorbell would teach the model that other bells are doorbells.
-    exclude_categories: [church_bells, clock_alarm]
+    exclude_categories:
+    - church_bells
+    - clock_alarm
   demand:
     # Domestic environments plus a hallway — closest to the deployed setting.
     # Other options: OOFFICE, OMEETING, PCAFETER, PRESTO, PSTATION, TBUS,
     # TCAR, TMETRO, SPSQUARE, STRAFFIC, SCAFE, NFIELD, NPARK, NRIVER
-    environments: [DKITCHEN, DLIVING, DWASHING, OHALLWAY]
+    environments:
+    - DKITCHEN
+    - DLIVING
+    - DWASHING
+    - OHALLWAY
 
-# Log-mel filterbank energies instead of MFCCs (this branch's experiment).
-# Geometry deliberately mirrors the cnn-mfcc baseline -- same n_fft, same
-# librosa-default hop of 512 (62 frames per 2000 ms chunk), same number of
-# bands as n_mfcc was -- so the only thing that changes between the two runs
-# is the missing DCT. Bump n_mels to widen the filterbank afterwards.
+# Which feature representation to build. `type` selects an entry in
+# src/features.py, which owns both the transform and the matching chunk
+# slicer; the remaining keys are that entry's parameters. Swapping
+# representation is `dvc exp run -S feature_extraction.type=...` rather than
+# a branch — see the variant table in README/CLAUDE.md.
+#
+# The default geometry targets ESP32-S3 inference: the first conv activation
+# (n_mels x n_frames x 32) is what has to fit in SRAM, and 40x100 lands at
+# ~125 KB int8 (internal SRAM) vs ~1 MB for the 129x250 STFT variant.
+# hop_length 320 = 20 ms, so a 2000 ms chunk is exactly 100 frames.
+#
+# features_dir must be distinct per geometry, so variants can coexist on
+# disk. extract_features.py stamps a feature_config.json into it and
+# draw_data.py refuses to slice arrays whose stamp disagrees with these
+# params, which is the backstop if two configs ever do share a directory.
 feature_extraction:
   type: logmel
-  features_dir: ./data/logmel_data
-  n_mels: 13
+  features_dir: ./data/features/logmel-40mel-320hop
+  n_mels: 40
   n_fft: 512 # 32 ms @ 16 kHz
-  hop_length: 512 # librosa.feature.mfcc default, kept for chunk-geometry parity
-  # librosa.feature.mfcc's own mel filterbank defaults: full 0..sr/2 band
-  fmin: 0
-  fmax: null
+  hop_length: 320 # 20 ms
+  fmin: 50
+  fmax: 8000
   log_offset: 1.0e-6
 
 training:
   test_size: 0.2
+  # Which model family trains on the chunks: `cnn` (src/train_cnn.py) keeps
+  # the 2D (bins, frames) structure, `xgboost` (src/train_xgboost.py)
+  # flattens it. yamnet features only work with the xgboost head — its
+  # slicer pools the time axis away — and train_model.py enforces that.
+  head: cnn
 
 model:
   learning_rate: 0.001
@@ -69,7 +95,19 @@ model:
   epochs: 100
   early_stopping_patience: 10
   dropout: 0.3
-  # MFCCs are already log-domain; raw STFT magnitudes are not (see
-  # train_cnn.py) — flip this on the spectrogram branch
+  # Raw STFT magnitudes span orders of magnitude — log-compress them before
+  # normalization (see train_cnn.py). The mfcc and logmel extractors already
+  # apply a log, so those variants set this false; flip it to true when
+  # running feature_extraction.type=stft.
   log_compress: false
   random_state: 42
+
+# int8 TFLite export for the ESP32-S3. Runs for every variant so candidates
+# are ranked after quantization, not before; non-cnn heads record a skip.
+export:
+  # Chunks drawn from the training fold to calibrate activation ranges
+  representative_samples: 500
+  # Hard gate: fail the export if int8 quantization costs more val F1 than
+  # this. Silent quantization collapse is the most likely way a variant
+  # produces a model that looks fine offline and does not work on device.
+  max_f1_drop: 0.01

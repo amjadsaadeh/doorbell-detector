@@ -36,9 +36,21 @@ noise_pools:
     # TCAR, TMETRO, SPSQUARE, STRAFFIC, SCAFE, NFIELD, NPARK, NRIVER
     environments: [DKITCHEN, DLIVING, DWASHING, OHALLWAY]
 
+# Log-mel filterbank energies instead of MFCCs (this branch's experiment).
+# Geometry deliberately mirrors the cnn-mfcc baseline -- same n_fft, same
+# librosa-default hop of 512 (62 frames per 2000 ms chunk), same number of
+# bands as n_mfcc was -- so the only thing that changes between the two runs
+# is the missing DCT. Bump n_mels to widen the filterbank afterwards.
 feature_extraction:
-  n_mfcc: 13
-  n_fft: 512
+  type: logmel
+  features_dir: ./data/logmel_data
+  n_mels: 13
+  n_fft: 512 # 32 ms @ 16 kHz
+  hop_length: 512 # librosa.feature.mfcc default, kept for chunk-geometry parity
+  # librosa.feature.mfcc's own mel filterbank defaults: full 0..sr/2 band
+  fmin: 0
+  fmax: null
+  log_offset: 1.0e-6
 
 training:
   test_size: 0.2

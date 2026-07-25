@@ -7,5 +7,7 @@
 /balanced_data.csv
 /balanced_data.h5
 /mfcc_data
+/logmel_data
+/logmel_data.esp32bak
 /augmented_audio
 /augmented_annotations.csv

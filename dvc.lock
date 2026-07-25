@@ -104,7 +104,7 @@ stages:
       md5: 7f431ecef78783885462ab82a0a0c919
       size: 474938
   extract_features:
-    cmd: python src/extract_mfcc_features.py
+    cmd: python src/extract_logmel_features.py
     deps:
     - path: data/audio
       hash: md5
@@ -126,22 +126,28 @@ stages:
       md5: 85588592640f55e87116bdd3aff2a4bb.dir
       size: 307284480
       nfiles: 1920
-    - path: src/extract_mfcc_features.py
+    - path: src/extract_logmel_features.py
       hash: md5
-      md5: 649d32b1c84af6f869345034c9079fc3
-      size: 2816
+      md5: 6384ac05d392c5a3ee6e1d60adf6ba3a
+      size: 4083
     params:
       params.yaml:
         augmentation.external_noise_pools:
         - data/noise/esc50
         - data/noise/demand
         feature_extraction:
-          n_mfcc: 13
+          type: logmel
+          features_dir: ./data/logmel_data
+          n_mels: 13
           n_fft: 512
+          hop_length: 512
+          fmin: 0
+          fmax:
+          log_offset: 1e-06
     outs:
-    - path: data/mfcc_data/
+    - path: data/logmel_data/
       hash: md5
-      md5: ce529fad2251baa58f9477a3215a2d9f.dir
+      md5: 11f2d2256b09c780318f5da5ff0978c6.dir
       size: 20623400
       nfiles: 2565
   train_model:
@@ -149,7 +155,7 @@ stages:
     deps:
     - path: data/balanced_data.h5
       hash: md5
-      md5: 7c22a0fafc2b91f2d228a28154151643
+      md5: 6b54edf8edc6673245c54d58dec70bb2
       size: 5447496
     - path: data/data_quality/chunk_balanced_quality.json
       hash: md5
@@ -190,11 +196,11 @@ stages:
     outs:
     - path: models/cnn_model.keras
       hash: md5
-      md5: 097a4094042ca9f841b58eb1c4de38b4
+      md5: c8d1379150b0606348ec335c328aefaf
       size: 214530
     - path: models/cnn_normalization.npz
       hash: md5
-      md5: 0dda9087ec4ed2a86ddafbd414c7a255
+      md5: 7c2da7f81113254299216d37b506a5fd
       size: 604
   draw_data:
     cmd: python src/draw_data.py
@@ -207,9 +213,9 @@ stages:
       hash: md5
       md5: d5e03769298bb73b1984c1978615f47a
       size: 70016
-    - path: data/mfcc_data/
+    - path: data/logmel_data/
       hash: md5
-      md5: ce529fad2251baa58f9477a3215a2d9f.dir
+      md5: 11f2d2256b09c780318f5da5ff0978c6.dir
       size: 20623400
       nfiles: 2565
     - path: data/noise/demand
@@ -224,8 +230,8 @@ stages:
       nfiles: 1920
     - path: src/draw_data.py
       hash: md5
-      md5: 4ced3eb486ed01205bae9d58d4ba3cb3
-      size: 9073
+      md5: f423df4d6d1735247692764e9d29344a
+      size: 9586
     params:
       params.yaml:
         augmentation.external_noise_pools:
@@ -234,11 +240,20 @@ stages:
         chunk_overlap: 250
         chunk_size: 2000
         external_background_ratio: 0.5
+        feature_extraction:
+          type: logmel
+          features_dir: ./data/logmel_data
+          n_mels: 13
+          n_fft: 512
+          hop_length: 512
+          fmin: 0
+          fmax:
+          log_offset: 1e-06
         inbalance_ratio: 1.0
     outs:
     - path: data/balanced_data.h5
       hash: md5
-      md5: 7c22a0fafc2b91f2d228a28154151643
+      md5: 6b54edf8edc6673245c54d58dec70bb2
       size: 5447496
     - path: data/data_quality/chunk_balanced_quality.json
       hash: md5

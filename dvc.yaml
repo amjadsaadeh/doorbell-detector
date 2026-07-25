@@ -66,18 +66,18 @@ stages:
     - data/augmented_annotations.csv
 
   extract_features:
-    cmd: python src/extract_mfcc_features.py
+    cmd: python src/extract_logmel_features.py
     deps:
     - data/audio
     - data/augmented_audio
     - data/noise/esc50
     - data/noise/demand
-    - src/extract_mfcc_features.py
+    - src/extract_logmel_features.py
     params:
     - feature_extraction
     - augmentation.external_noise_pools
     outs:
-    - data/mfcc_data/
+    - data/logmel_data/
 
   draw_data:
     cmd: python src/draw_data.py
@@ -87,10 +87,12 @@ stages:
     - chunk_size
     - chunk_overlap
     - augmentation.external_noise_pools
+    # features_dir/hop_length/type drive where and how chunks are sliced
+    - feature_extraction
     deps:
     - data/annotation_per_row_data.csv
     - data/augmented_annotations.csv
-    - data/mfcc_data/
+    - data/logmel_data/
     - data/noise/esc50
     - data/noise/demand
     - src/draw_data.py

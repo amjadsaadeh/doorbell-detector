@@ -1,0 +1,30 @@
+{
+  "cli_version": "0.8.42",
+  "checkpoint_id": "bedf520b38ef",
+  "strategy": "manual-commit",
+  "checkpoints_count": 3,
+  "files_touched": [
+    "data/features/.gitignore",
+    "dvc.lock",
+    "models/tflite_metrics.json",
+    "params.yaml",
+    "pyproject.toml",
+    "uv.lock"
+  ],
+  "sessions": [
+    {
+      "metadata": "/be/df520b38ef/0/metadata.json",
+      "transcript": "/be/df520b38ef/0/full.jsonl",
+      "compact_transcript": "/be/df520b38ef/0/transcript.jsonl",
+      "content_hash": "/be/df520b38ef/0/content_hash.txt",
+      "prompt": "/be/df520b38ef/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 50,
+    "cache_creation_tokens": 31191,
+    "cache_read_tokens": 5012532,
+    "output_tokens": 14853,
+    "api_call_count": 25
+  }
+}

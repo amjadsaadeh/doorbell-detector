@@ -1,0 +1,17 @@
+<task-notification>
+<task-id>bce95hqfj</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/tmp/claude-1000/-home-orchid-projects-doorbell-detector/b176bc19-ae06-4cf4-a2ef-39cd5cdd7437/tasks/bce95hqfj.output</output-file>
+<status>completed</status>
+<summary>Background command "Run STFT variant" completed (exit code 0)</summary>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>b3ajopbd7</task-id>
+<tool-use-id>toolu_01NYYrGuNiNSZh4JsWkFJJmG</tool-use-id>
+<output-file>/tmp/claude-1000/-home-orchid-projects-doorbell-detector/b176bc19-ae06-4cf4-a2ef-39cd5cdd7437/tasks/b3ajopbd7.output</output-file>
+<status>completed</status>
+<summary>Background command "Run YAMNet + xgboost variant" completed (exit code 0)</summary>
+</task-notification>

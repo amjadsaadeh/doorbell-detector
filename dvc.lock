@@ -138,7 +138,7 @@ stages:
         feature_extraction:
           type: logmel
           features_dir: ./data/logmel_data
-          n_mels: 13
+          n_mels: 40
           n_fft: 512
           hop_length: 512
           fmin: 0
@@ -147,16 +147,16 @@ stages:
     outs:
     - path: data/logmel_data/
       hash: md5
-      md5: 11f2d2256b09c780318f5da5ff0978c6.dir
-      size: 20623400
+      md5: f630c418c7f282b9ffca50e926231dce.dir
+      size: 62774720
       nfiles: 2565
   train_model:
     cmd: python src/train_cnn.py
     deps:
     - path: data/balanced_data.h5
       hash: md5
-      md5: 6b54edf8edc6673245c54d58dec70bb2
-      size: 5447496
+      md5: d935296f91b1f4d52b58ddc7dd832633
+      size: 14139992
     - path: data/data_quality/chunk_balanced_quality.json
       hash: md5
       md5: 567e53b8e1cbd34a94241d3182c3c925
@@ -196,12 +196,12 @@ stages:
     outs:
     - path: models/cnn_model.keras
       hash: md5
-      md5: c8d1379150b0606348ec335c328aefaf
-      size: 214530
+      md5: af7d70c9bfdbbf3e16d868ec83618ef3
+      size: 214542
     - path: models/cnn_normalization.npz
       hash: md5
-      md5: 7c2da7f81113254299216d37b506a5fd
-      size: 604
+      md5: 189fb6a3bdaa0fc25940e36550fded61
+      size: 820
   draw_data:
     cmd: python src/draw_data.py
     deps:
@@ -215,8 +215,8 @@ stages:
       size: 70016
     - path: data/logmel_data/
       hash: md5
-      md5: 11f2d2256b09c780318f5da5ff0978c6.dir
-      size: 20623400
+      md5: f630c418c7f282b9ffca50e926231dce.dir
+      size: 62774720
       nfiles: 2565
     - path: data/noise/demand
       hash: md5
@@ -243,7 +243,7 @@ stages:
         feature_extraction:
           type: logmel
           features_dir: ./data/logmel_data
-          n_mels: 13
+          n_mels: 40
           n_fft: 512
           hop_length: 512
           fmin: 0
@@ -253,8 +253,8 @@ stages:
     outs:
     - path: data/balanced_data.h5
       hash: md5
-      md5: 6b54edf8edc6673245c54d58dec70bb2
-      size: 5447496
+      md5: d935296f91b1f4d52b58ddc7dd832633
+      size: 14139992
     - path: data/data_quality/chunk_balanced_quality.json
       hash: md5
       md5: 567e53b8e1cbd34a94241d3182c3c925

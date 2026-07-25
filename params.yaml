@@ -44,7 +44,7 @@ noise_pools:
 feature_extraction:
   type: logmel
   features_dir: ./data/logmel_data
-  n_mels: 13
+  n_mels: 40
   n_fft: 512 # 32 ms @ 16 kHz
   hop_length: 512 # librosa.feature.mfcc default, kept for chunk-geometry parity
   # librosa.feature.mfcc's own mel filterbank defaults: full 0..sr/2 band

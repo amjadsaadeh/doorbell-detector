@@ -1,0 +1,7 @@
+<task-notification>
+<task-id>b0pf6c4h6</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/tmp/claude-1000/-home-orchid-projects-doorbell-detector/b176bc19-ae06-4cf4-a2ef-39cd5cdd7437/tasks/b0pf6c4h6.output</output-file>
+<status>completed</status>
+<summary>Background command "Run pipeline: 40 mels, harder SNRs" completed (exit code 0)</summary>
+</task-notification>

@@ -94,7 +94,7 @@ def main():
     with open("params.yaml", "r") as file:
         params = yaml.safe_load(file)
 
-    model_params = params["model"]
+    model_params = params["model"]["xgboost"]
 
     # Load data
     df = pd.read_hdf(DATA_FILE, key="data")
@@ -143,7 +143,11 @@ def main():
         # Train model. Passing both train and test as eval_set makes XGBoost
         # report train/test eval_metric every boosting round, which
         # mlflow.xgboost.autolog logs as stepped metrics -> the loss curve.
-        model = xgb.XGBClassifier(objective="binary:logistic", **model_params)
+        model = xgb.XGBClassifier(
+            objective="binary:logistic",
+            random_state=params["training"]["random_state"],
+            **model_params,
+        )
         model.fit(
             X_train,
             y_train,

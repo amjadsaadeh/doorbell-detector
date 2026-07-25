@@ -83,24 +83,30 @@ feature_extraction:
 
 training:
   test_size: 0.2
+  # Seed for the split, and for whichever head trains on it
+  random_state: 42
   # Which model family trains on the chunks: `cnn` (src/train_cnn.py) keeps
   # the 2D (bins, frames) structure, `xgboost` (src/train_xgboost.py)
   # flattens it. yamnet features only work with the xgboost head — its
   # slicer pools the time axis away — and train_model.py enforces that.
   head: cnn
 
+# Per-head hyperparameters. Nested because the two heads share nothing: a
+# flat block meant XGBoost silently received the CNN's learning_rate (0.001,
+# against xgboost's default 100 estimators) plus dropout/epochs as unknown
+# kwargs, and barely learned at all.
 model:
-  learning_rate: 0.001
-  batch_size: 32
-  epochs: 100
-  early_stopping_patience: 10
-  dropout: 0.3
-  # Raw STFT magnitudes span orders of magnitude — log-compress them before
-  # normalization (see train_cnn.py). The mfcc and logmel extractors already
-  # apply a log, so those variants set this false; flip it to true when
-  # running feature_extraction.type=stft.
-  log_compress: false
-  random_state: 42
+  cnn:
+    learning_rate: 0.001
+    batch_size: 32
+    epochs: 100
+    early_stopping_patience: 10
+    dropout: 0.3
+  xgboost:
+    n_estimators: 25
+    max_depth: 6
+    learning_rate: 0.1
+    eval_metric: ["logloss", "error"]
 
 # int8 TFLite export for the ESP32-S3. Runs for every variant so candidates
 # are ranked after quantization, not before; non-cnn heads record a skip.

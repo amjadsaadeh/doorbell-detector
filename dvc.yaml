@@ -160,8 +160,7 @@ stages:
     - src/paths.py
     params:
     - export
-    - model.log_compress
-    - model.random_state
+    - model.cnn
     - training
     outs:
     - models/export

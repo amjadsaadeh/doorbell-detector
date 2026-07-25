@@ -217,7 +217,7 @@ def main():
     float_pred = (float_scores > 0.5).astype(int)
     float_metrics = compute_metrics(y_test, float_pred, "float_val")
 
-    rng = np.random.default_rng(params["model"]["random_state"])
+    rng = np.random.default_rng(params["training"]["random_state"])
     n_rep = min(export_params["representative_samples"], len(X_train))
     representative = X_train[rng.choice(len(X_train), n_rep, replace=False)]
 

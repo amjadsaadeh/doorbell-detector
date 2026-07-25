@@ -35,6 +35,11 @@ to train an XGBoost bell classifier.
   `draw_data.py` refuses to slice arrays whose stamp disagrees with `params.yaml`. This
   is the guard for the failure that produced `data/logmel_data.esp32bak`: two branches
   wrote different geometry (13 bands @ hop 512 vs 40 @ hop 320) into one directory name.
+- **Hyperparameters are per head** (`model.cnn`, `model.xgboost`). A flat block
+  meant XGBoost silently received the CNN's `learning_rate: 0.001` plus
+  `dropout`/`epochs` as unknown kwargs and barely trained. Whether a representation
+  needs log-compression before normalization is likewise a `FeatureSpec` property
+  (`needs_log_compression`, true only for `stft`), not a params flag to remember.
 - **`export_model` runs for every variant**, so candidates are ranked on their
   post-quantization score rather than their float32 one; `export.max_f1_drop` fails the
   stage on quantization collapse. Non-`cnn` heads write `models/export/SKIPPED.json`

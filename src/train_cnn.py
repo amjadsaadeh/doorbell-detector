@@ -24,6 +24,7 @@ from sklearn.metrics import ConfusionMatrixDisplay
 from sklearn.model_selection import StratifiedGroupKFold
 from sklearn.preprocessing import LabelEncoder
 
+from features import get_spec
 from paths import DATA_FILE, MODEL_DIR
 from train_xgboost import (
     MLFLOW_EXPERIMENT_NAME,
@@ -58,10 +59,9 @@ def load_dataset(params: dict):
     df = pd.read_hdf(DATA_FILE, key="data")
     X, y, le, feature_type = prepare_data(df)
 
-    # Raw STFT magnitudes span orders of magnitude; log-compression makes
-    # them tractable for a CNN. MFCC and log-mel branches are already in the
-    # log domain (the extractor does it), so they set this false.
-    if params["model"]["log_compress"]:
+    # Whether this is needed is a property of the representation, declared
+    # in features.py, not a flag someone has to remember to flip.
+    if get_spec(params["feature_extraction"]["type"]).needs_log_compression:
         X = np.log(X + 1e-6)
 
     groups = df["split_group"].to_numpy()
@@ -117,9 +117,9 @@ def main():
 
     with open("params.yaml", "r") as file:
         params = yaml.safe_load(file)
-    model_params = params["model"]
+    model_params = params["model"]["cnn"]
 
-    keras.utils.set_random_seed(model_params["random_state"])
+    keras.utils.set_random_seed(params["training"]["random_state"])
 
     X, y, le, feature_type, groups = load_dataset(params)
 

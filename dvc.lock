@@ -140,8 +140,8 @@ stages:
       size: 3088
     - path: src/features.py
       hash: md5
-      md5: f48d6336d6688ab39d97b91db3c7ad1e
-      size: 11065
+      md5: 8acb8eab1ae16c8b641e62f6001cec78
+      size: 11506
     - path: src/paths.py
       hash: md5
       md5: a03368e21b3148e0cd1a65b4c5c234da
@@ -168,7 +168,7 @@ stages:
     deps:
     - path: data/balanced_data.h5
       hash: md5
-      md5: 2ca05a3064b1c176bf8f037b090ef157
+      md5: e433ebbea9b538a5ef0a858d94757fdb
       size: 29667272
     - path: data/data_quality/chunk_balanced_quality.json
       hash: md5
@@ -188,41 +188,48 @@ stages:
       size: 55
     - path: src/features.py
       hash: md5
-      md5: f48d6336d6688ab39d97b91db3c7ad1e
-      size: 11065
+      md5: 8acb8eab1ae16c8b641e62f6001cec78
+      size: 11506
     - path: src/paths.py
       hash: md5
       md5: a03368e21b3148e0cd1a65b4c5c234da
       size: 564
     - path: src/train_cnn.py
       hash: md5
-      md5: ee6b15c2cc5ae30d70e142c5b15440e8
-      size: 8080
+      md5: 93195cd5512128e72a582fbd70b68b64
+      size: 8084
     - path: src/train_model.py
       hash: md5
       md5: 7afe6fd0ee2852f8e4ac8f3118715f1c
       size: 1653
     - path: src/train_xgboost.py
       hash: md5
-      md5: 1f3cf5bd8d77ca93e7930bde95b52409
-      size: 6935
+      md5: fa3b01a0c22acf12898b85b7a52ae6fd
+      size: 7042
     params:
       params.yaml:
         model:
-          learning_rate: 0.001
-          batch_size: 32
-          epochs: 100
-          early_stopping_patience: 10
-          dropout: 0.3
-          log_compress: false
-          random_state: 42
+          cnn:
+            learning_rate: 0.001
+            batch_size: 32
+            epochs: 100
+            early_stopping_patience: 10
+            dropout: 0.3
+          xgboost:
+            n_estimators: 25
+            max_depth: 6
+            learning_rate: 0.1
+            eval_metric:
+            - logloss
+            - error
         training:
           test_size: 0.2
+          random_state: 42
           head: cnn
     outs:
     - path: models/trained
       hash: md5
-      md5: 58e614b7e6136de671931b9a802805ea.dir
+      md5: 0a48e2bc88af8d6fc233485833947a93.dir
       size: 215369
       nfiles: 2
   draw_data:
@@ -243,8 +250,8 @@ stages:
       size: 2348
     - path: src/features.py
       hash: md5
-      md5: f48d6336d6688ab39d97b91db3c7ad1e
-      size: 11065
+      md5: 8acb8eab1ae16c8b641e62f6001cec78
+      size: 11506
     - path: src/paths.py
       hash: md5
       md5: a03368e21b3148e0cd1a65b4c5c234da
@@ -263,7 +270,7 @@ stages:
     outs:
     - path: data/balanced_data.h5
       hash: md5
-      md5: 2ca05a3064b1c176bf8f037b090ef157
+      md5: e433ebbea9b538a5ef0a858d94757fdb
       size: 29667272
   augmentation:
     cmd: python src/augment_data.py
@@ -441,38 +448,43 @@ stages:
     deps:
     - path: data/balanced_data.h5
       hash: md5
-      md5: 2ca05a3064b1c176bf8f037b090ef157
+      md5: e433ebbea9b538a5ef0a858d94757fdb
       size: 29667272
     - path: models/trained
       hash: md5
-      md5: 58e614b7e6136de671931b9a802805ea.dir
+      md5: 0a48e2bc88af8d6fc233485833947a93.dir
       size: 215369
       nfiles: 2
     - path: src/export_tflite.py
       hash: md5
-      md5: efaa48c0d2a92185cf9c593fefcbc901
-      size: 11552
+      md5: b3a0301d43a08f3f7b02acba1c96f54a
+      size: 11555
     - path: src/paths.py
       hash: md5
       md5: a03368e21b3148e0cd1a65b4c5c234da
       size: 564
     - path: src/train_cnn.py
       hash: md5
-      md5: ee6b15c2cc5ae30d70e142c5b15440e8
-      size: 8080
+      md5: 93195cd5512128e72a582fbd70b68b64
+      size: 8084
     - path: src/train_xgboost.py
       hash: md5
-      md5: 1f3cf5bd8d77ca93e7930bde95b52409
-      size: 6935
+      md5: fa3b01a0c22acf12898b85b7a52ae6fd
+      size: 7042
     params:
       params.yaml:
         export:
           representative_samples: 500
           max_f1_drop: 0.01
-        model.log_compress: false
-        model.random_state: 42
+        model.cnn:
+          learning_rate: 0.001
+          batch_size: 32
+          epochs: 100
+          early_stopping_patience: 10
+          dropout: 0.3
         training:
           test_size: 0.2
+          random_state: 42
           head: cnn
     outs:
     - path: models/export

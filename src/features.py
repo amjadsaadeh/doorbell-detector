@@ -74,9 +74,9 @@ def extract_logmel(
     not want that: it wants the locally correlated structure along the
     frequency axis that the DCT destroys.
 
-    The log is applied here rather than in the trainer, so params.yaml sets
-    model.log_compress: false for this type and the .npy files are exactly
-    what an on-device C frontend has to reproduce.
+    The log is applied here rather than in the trainer (hence
+    needs_log_compression=False), so the .npy files are exactly what an
+    on-device C frontend has to reproduce.
     """
     import librosa
 
@@ -97,8 +97,8 @@ def extract_logmel(
 
 
 def extract_stft(file_path, n_fft: int, hop_length: int) -> np.ndarray:
-    """Raw STFT magnitude. Not log-compressed here -- params.yaml sets
-    model.log_compress: true for this type so the trainer does it."""
+    """Raw STFT magnitude. Not log-compressed here -- the spec declares
+    needs_log_compression=True so the trainer does it after slicing."""
     from scipy.signal import stft
 
     samples, sample_rate = _load_mono_int16_scale(file_path)
@@ -197,6 +197,12 @@ class FeatureSpec:
     # time axis away and returns a 1D embedding, which only the flattening
     # tree head can consume.
     keeps_time_axis: bool = True
+    # Whether the trainer must log-compress before normalizing. A property of
+    # the representation, not of the model: raw STFT magnitudes span orders of
+    # magnitude, while mfcc/logmel already had a log applied by the extractor.
+    # Previously a params.yaml flag with a "flip this on the spectrogram
+    # branch" comment -- exactly the kind of thing that silently stays wrong.
+    needs_log_compression: bool = False
 
 
 REGISTRY: dict[str, FeatureSpec] = {
@@ -214,6 +220,7 @@ REGISTRY: dict[str, FeatureSpec] = {
         params=("n_fft", "hop_length"),
         extract=extract_stft,
         slice_chunk=fixed_rate_slice,
+        needs_log_compression=True,
     ),
     "yamnet": FeatureSpec(
         params=(),

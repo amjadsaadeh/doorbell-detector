@@ -237,3 +237,50 @@ class TestLiveParams(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestLogCompression(unittest.TestCase):
+    """Whether the trainer must log-compress is a property of the
+    representation, not a params flag someone has to flip per branch."""
+
+    def test_only_stft_needs_log_compression(self):
+        needing = {n for n, s in REGISTRY.items() if s.needs_log_compression}
+        self.assertEqual(needing, {"stft"})
+
+    def test_log_domain_extractors_do_not_double_log(self):
+        # logmel already applies the log, so re-logging would be wrong
+        self.assertFalse(REGISTRY["logmel"].needs_log_compression)
+        self.assertFalse(REGISTRY["mfcc"].needs_log_compression)
+
+    def test_yamnet_is_not_log_compressed(self):
+        """YAMNet embeddings go negative; np.log would produce NaN."""
+        self.assertFalse(REGISTRY["yamnet"].needs_log_compression)
+
+
+class TestPerHeadParams(unittest.TestCase):
+    """Regression: a single flat `model:` block fed both heads, so XGBoost
+    got the CNN's learning_rate and trained to val F1 0.0."""
+
+    def setUp(self):
+        with open(PARAMS_PATH) as f:
+            self.params = yaml.safe_load(f)
+
+    def test_each_head_has_its_own_block(self):
+        for head in ("cnn", "xgboost"):
+            self.assertIn(head, self.params["model"], f"missing model.{head}")
+
+    def test_blocks_do_not_leak_foreign_hyperparameters(self):
+        cnn, xgboost = self.params["model"]["cnn"], self.params["model"]["xgboost"]
+        for key in ("dropout", "epochs", "batch_size", "early_stopping_patience"):
+            self.assertNotIn(key, xgboost, f"{key} is not an XGBoost parameter")
+        for key in ("n_estimators", "max_depth", "eval_metric"):
+            self.assertNotIn(key, cnn, f"{key} is not a Keras parameter")
+
+    def test_xgboost_learning_rate_is_tree_scaled(self):
+        """0.001 (the CNN's) against xgboost's few estimators does not learn."""
+        self.assertGreaterEqual(self.params["model"]["xgboost"]["learning_rate"], 0.01)
+
+    def test_random_state_is_shared_not_per_head(self):
+        self.assertIn("random_state", self.params["training"])
+        for head in ("cnn", "xgboost"):
+            self.assertNotIn("random_state", self.params["model"][head])

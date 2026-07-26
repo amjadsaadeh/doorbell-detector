@@ -37,19 +37,6 @@ def iter_folds(X, y, groups, test_size: float, n_eval_folds: int | None = None):
         yield fold, train_idx, test_idx, n_splits
 
 
-def prepare_split(X, y, groups, test_size: float, fold: int = 0):
-    """Indices for one fold.
-
-    export_tflite.py scores the saved model, and the saved model is fold 0's
-    (see the trainers), so the default here has to stay 0 -- otherwise the
-    export would be validated against data the model was trained on.
-    """
-    for current, train_idx, test_idx, n_splits in iter_folds(X, y, groups, test_size):
-        if current == fold:
-            return train_idx, test_idx, n_splits
-    raise ValueError(f"fold {fold} is out of range for test_size {test_size}")
-
-
 def aggregate_fold_metrics(per_fold: list[dict]) -> dict:
     """Mean, spread and worst case across CV folds.
 

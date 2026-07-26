@@ -35,7 +35,6 @@ from paths import (
     EXPORT_DIR,
     MANIFEST_PATH,
 )
-from splits import prepare_split
 from tflite_utils import C_ARRAY_VAR, build_export_model, convert_int8, write_c_array
 from train_cnn import MODEL_PATH, load_dataset
 
@@ -44,17 +43,21 @@ TFLITE_PATH = EXPORT_DIR / "doorbell_int8.tflite"
 C_ARRAY_PATH = EXPORT_DIR / "doorbell_model_data.cc"
 
 
-def select_calibration_rows(train_idx: np.ndarray, n_samples: int, seed: int):
-    """Pick calibration chunks from the training fold only.
+def select_calibration_rows(candidate_idx: np.ndarray, n_samples: int, seed: int):
+    """Pick calibration chunks from the rows the model was fitted on.
 
-    Drawn from train_idx rather than from a re-indexed X_train so the saved
-    indices are dataset-global and join straight back to chunk_manifest.csv.
-    Training fold only: calibrating on the validation chunks would tune the
-    activation ranges to the very data the next stage scores against.
+    Indices are dataset-global (positions in chunk_manifest.csv), not offsets
+    into some re-indexed array, so the saved selection joins straight back to
+    the manifest and names actual recordings.
+
+    The shipped model is refit on 100% of the chunks (see train_cnn.main), so
+    every row is a candidate. There is nothing to exclude: no held-out set
+    exists for this model, which is exactly why evaluate_quantized.py reports
+    a float-vs-int8 delta instead of an accuracy.
     """
     rng = np.random.default_rng(seed)
-    n_samples = min(n_samples, len(train_idx))
-    picked = rng.choice(train_idx, size=n_samples, replace=False)
+    n_samples = min(n_samples, len(candidate_idx))
+    picked = rng.choice(candidate_idx, size=n_samples, replace=False)
     picked.sort()
     return picked
 
@@ -110,16 +113,14 @@ def main():
     # load_dataset -> prepare_data already appends the channel axis, so X is
     # (n, n_bins, n_frames, 1) here, and un-normalized: the Rescaling layer
     # added below is what consumes raw features, exactly like the firmware.
-    X, y, _, _, groups = load_dataset(params)
-    # fold 0, because the saved model is fold 0's (see train_cnn.main)
-    train_idx, _, _ = prepare_split(X, y, groups, params["training"]["test_size"])
+    X, _, _, _, _ = load_dataset(params)
 
     trained = keras.models.load_model(MODEL_PATH)
     stats = np.load(NORMALIZATION_PATH)
     export_model = build_export_model(trained, stats["mean"], stats["std"])
 
     rows = select_calibration_rows(
-        train_idx,
+        np.arange(len(X)),
         params["quantization"]["calibration_samples"],
         params["training"]["random_state"],
     )
@@ -131,7 +132,7 @@ def main():
     TFLITE_PATH.write_bytes(tflite_model)
     write_c_array(tflite_model, C_ARRAY_PATH, C_ARRAY_VAR)
 
-    print(f"calibrated on {len(rows)} training chunks -> {CALIBRATION_DIR}")
+    print(f"calibrated on {len(rows)} of {len(X)} chunks -> {CALIBRATION_DIR}")
     print(f"int8 model {len(tflite_model) / 1024:.1f} KB -> {TFLITE_PATH}")
 
 

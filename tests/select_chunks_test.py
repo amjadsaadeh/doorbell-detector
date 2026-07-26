@@ -214,20 +214,6 @@ class TestIterFolds(unittest.TestCase):
         self.assertEqual(len(self.folds(test_size=0.25)), 4)
         self.assertEqual(len(self.folds(test_size=0.5)), 2)
 
-    def test_prepare_split_returns_fold_zero_by_default(self):
-        from src.splits import prepare_split
-
-        train_idx, test_idx, _ = prepare_split(self.X, self.y, self.groups, 0.2)
-        _, expected_train, expected_test, _ = self.folds()[0]
-        np.testing.assert_array_equal(train_idx, expected_train)
-        np.testing.assert_array_equal(test_idx, expected_test)
-
-    def test_prepare_split_rejects_out_of_range_fold(self):
-        from src.splits import prepare_split
-
-        with self.assertRaises(ValueError):
-            prepare_split(self.X, self.y, self.groups, 0.2, fold=99)
-
 
 class TestAggregateFoldMetrics(unittest.TestCase):
 

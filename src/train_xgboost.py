@@ -131,7 +131,7 @@ def main():
         log_data_quality()
 
         val_per_fold, train_per_fold, test_fractions = [], [], []
-        artifact = None
+        fold0_eval = None
 
         for fold, train_idx, test_idx, n_splits in iter_folds(
             X, y, groups, training["test_size"], training["n_eval_folds"]
@@ -171,8 +171,10 @@ def main():
                 f"({len(test_idx)} chunks)"
             )
 
+            # Kept only for the confusion matrix; the shipped model is the
+            # full-data refit below.
             if fold == 0:
-                artifact = (model, y_test, y_pred)
+                fold0_eval = (y_test, y_pred)
                 # Per-round train/test curve, the replacement for what
                 # autolog used to emit. eval_set order above names these
                 # validation_0=train, validation_1=test.
@@ -206,8 +208,7 @@ def main():
             f"(worst {val_summary['val_f1_score_min']:.4f})"
         )
 
-        model, y_test, y_pred = artifact
-
+        y_test, y_pred = fold0_eval
         fig, ax = plt.subplots()
         ConfusionMatrixDisplay.from_predictions(
             le.inverse_transform(y_test), le.inverse_transform(y_pred), ax=ax
@@ -215,7 +216,22 @@ def main():
         mlflow.log_figure(fig, "confusion_matrix_fold0.png")
         plt.close(fig)
 
-        # Save model
+        # ---- Final model: refit on 100% of the chunks ----
+        # The CV block above is the generalization estimate; this refit is the
+        # deliverable and gets the chunks every CV model held out. It has no
+        # held-out data of its own, so nothing downstream can measure its
+        # accuracy honestly -- insample_full below is a did-it-fit check only.
+        mlflow.log_param("final_fit_chunks", int(len(y)))
+        print(f"refitting on all {len(y)} chunks")
+
+        model = xgb.XGBClassifier(
+            objective="binary:logistic",
+            random_state=training["random_state"],
+            **model_params,
+        )
+        model.fit(X, y, verbose=False)
+        mlflow.log_metrics(compute_metrics(y, model.predict(X), "insample_full"))
+
         model_path = MODEL_DIR / "xgboost_model.json"
         model_path.parent.mkdir(parents=True, exist_ok=True)
         model.save_model(model_path)

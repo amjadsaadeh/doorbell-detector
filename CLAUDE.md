@@ -56,10 +56,15 @@ to train an XGBoost bell classifier.
   `-quantized` suffix (e.g. `cnn-logmel-unified-pipeline-quantized`, tagged
   `stage=quantized`). It carries the calibration `.npz` + `.csv` as artifacts and its
   md5 as a param, so a quantized model in MLflow can be matched to a DVC-tracked
-  calibration set. `quantization.max_f1_drop` fails the stage on collapse. Note the
-  float-vs-int8 comparison uses fold 0 only — the one split the saved model never saw —
-  so it is a quantization delta, not a model-quality claim; `f1_drop` is the number
-  that matters there.
+  calibration set. `quantization.max_f1_drop` fails the stage on collapse.
+- **The quantized run measures a delta, not quality**, and is tagged
+  `metric_scope: in-sample float-vs-int8 delta` to say so. Comparing two versions of one
+  model needs no held-out data, so it scores **all** chunks — which is the point.
+  Measured on a single 183-chunk fold, `max_score_deviation` read 0.0078; across all
+  1770 it is **0.0868**, an ~11x larger perturbation that the small fold simply could
+  not see. `f1_drop` saturates and can even go slightly negative (int8 flipping one
+  borderline sample the right way); `max_score_deviation` is the metric that moves
+  first, and 0.0868 against a 0.5 decision threshold is the real margin to watch.
 
 - **Storage layout:** bucket `doorbell-detector` on MinIO — `raw/` (audio, Label Studio
   source storage), `annotations/` (Label Studio target-storage sync, backup only),
@@ -127,9 +132,17 @@ to train an XGBoost bell classifier.
   mean under the plain name (`val_f1_score`) plus `_std` / `_min` companions and
   per-fold `fold{i}_*` metrics. `training.n_eval_folds: null` means all folds; set it
   to 1 for a fast iteration loop, at the old credibility.
-- **The saved model is fold 0's**, and `export_tflite.py` re-derives fold 0 via
-  `prepare_split(..., fold=0)` so int8 is scored against data that model never saw.
-  Do not change one without the other.
+- **The shipped model is a final refit on 100% of the chunks**, trained after the CV
+  loop. CV establishes what a model built this way scores; the refit is the deliverable
+  and gets the ~20% of chunks every CV model held out. It has no validation split, so
+  `EarlyStopping` cannot run — it trains for the mean epoch at which the folds'
+  `val_loss` bottomed out (`final_fit_epochs`, logged), the only unbiased epoch estimate
+  available. Its in-sample metrics are logged as `insample_full_*`: a did-it-fit check,
+  never a performance claim.
+- **Consequence: nothing after `train_model` can measure accuracy honestly.** The
+  generalization estimate is `val_f1_score` (± `_std`) on the training run, full stop.
+  If you ever need a held-out number for the shipped model, carve out a fixed holdout
+  before CV — do not read one out of the quantization stage.
 
 ## GSD Workflow
 

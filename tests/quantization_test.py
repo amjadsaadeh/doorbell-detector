@@ -20,18 +20,16 @@ PARAMS_PATH = Path(__file__).parent.parent / "params.yaml"
 class TestSelectCalibrationRows(unittest.TestCase):
 
     def setUp(self):
-        # a 1000-row dataset whose training fold is everything but 0..199
+        # an offset candidate range, to catch index-space mistakes
         self.train_idx = np.arange(200, 1000)
 
-    def test_drawn_only_from_the_training_fold(self):
-        """Calibrating on validation chunks would fit the activation ranges
-        to the very data evaluate_quantized.py then scores against."""
+    def test_never_leaves_the_candidate_rows(self):
         rows = select_calibration_rows(self.train_idx, 500, seed=42)
         self.assertTrue(set(rows).issubset(set(self.train_idx.tolist())))
 
     def test_indices_are_dataset_global(self):
         """They have to join back to chunk_manifest.csv, so they must be the
-        original row numbers, not offsets into a re-indexed X_train."""
+        original row numbers, not offsets into a re-indexed subset."""
         rows = select_calibration_rows(self.train_idx, 10, seed=0)
         self.assertTrue((rows >= 200).all())
 

@@ -76,6 +76,18 @@ def normalization_stats(X_train: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     return mean, np.maximum(std, 1e-6)
 
 
+def build_and_compile(input_shape, model_params: dict):
+    from tensorflow import keras
+
+    model = build_model(input_shape, model_params["dropout"])
+    model.compile(
+        optimizer=keras.optimizers.Adam(model_params["learning_rate"]),
+        loss="binary_crossentropy",
+        metrics=["accuracy"],
+    )
+    return model
+
+
 def build_model(input_shape: tuple[int, int, int], dropout: float):
     from tensorflow import keras
     from tensorflow.keras import layers
@@ -132,8 +144,8 @@ def main():
                     {k: float(v) for k, v in (logs or {}).items()}, step=epoch
                 )
 
-        val_per_fold, train_per_fold, test_fractions = [], [], []
-        artifact = None
+        val_per_fold, train_per_fold, test_fractions, best_epochs = [], [], [], []
+        fold0_eval = None
 
         for fold, train_idx, test_idx, n_splits in iter_folds(
             X, y, groups, training["test_size"], training["n_eval_folds"]
@@ -151,24 +163,18 @@ def main():
             X_train = (X_train - mean) / std
             X_test = (X_test - mean) / std
 
-            model = build_model(X_train.shape[1:], model_params["dropout"])
-            model.compile(
-                optimizer=keras.optimizers.Adam(model_params["learning_rate"]),
-                loss="binary_crossentropy",
-                metrics=["accuracy"],
-            )
+            model = build_and_compile(X_train.shape[1:], model_params)
 
-            callbacks = [
-                keras.callbacks.EarlyStopping(
-                    monitor="val_loss",
-                    patience=model_params["early_stopping_patience"],
-                    restore_best_weights=True,
-                )
-            ]
+            early_stopping = keras.callbacks.EarlyStopping(
+                monitor="val_loss",
+                patience=model_params["early_stopping_patience"],
+                restore_best_weights=True,
+            )
+            callbacks = [early_stopping]
             if fold == 0:
                 callbacks.append(EpochLogger())
 
-            model.fit(
+            history = model.fit(
                 X_train,
                 y_train,
                 validation_data=(X_test, y_test),
@@ -189,20 +195,23 @@ def main():
             val_per_fold.append(fold_val)
             train_per_fold.append(fold_train)
             test_fractions.append(len(test_idx) / len(y))
+            # Where val_loss actually bottomed out. The final refit has no
+            # validation split to early-stop against, so it borrows the
+            # epoch count these folds converged at.
+            best_epochs.append(getattr(early_stopping, "best_epoch", len(history.epoch) - 1) + 1)
 
             print(
                 f"fold {fold}: val_f1={fold_val['val_f1_score']:.4f} "
                 f"({len(test_idx)} chunks)"
             )
 
-            # Fold 0's model is the deliverable; export_tflite.py re-derives
-            # fold 0 so it scores int8 against a fold this model never saw.
+            # Fold 0's held-out predictions are kept only for the confusion
+            # matrix; the shipped model is the full-data refit below.
             if fold == 0:
-                artifact = (model, mean, std, y_test, y_pred)
+                fold0_eval = (y_test, y_pred)
 
         n_evaluated = len(val_per_fold)
         mlflow.log_param("n_eval_folds", n_evaluated)
-        mlflow.log_param("n_model_params", artifact[0].count_params())
         mlflow.log_param(
             "split_strategy",
             f"StratifiedGroupKFold by split_group, {n_evaluated}/{n_splits} folds evaluated",
@@ -222,14 +231,54 @@ def main():
             f"(worst {val_summary['val_f1_score_min']:.4f})"
         )
 
-        model, mean, std, y_test, y_pred = artifact
-
+        y_test, y_pred = fold0_eval
         fig, ax = plt.subplots()
         ConfusionMatrixDisplay.from_predictions(
             le.inverse_transform(y_test), le.inverse_transform(y_pred), ax=ax
         )
         mlflow.log_figure(fig, "confusion_matrix_fold0.png")
         plt.close(fig)
+
+        # ---- Final model: refit on 100% of the chunks ----
+        #
+        # The CV block above is the generalization estimate and is the only
+        # thing entitled to make one; this refit is the deliverable, and it
+        # gets the ~20% of chunks that sat in the validation fold of every
+        # single CV model.
+        #
+        # The consequence is deliberate and has to be understood downstream:
+        # this model has NO held-out data, so nothing after this point can
+        # measure its accuracy honestly. evaluate_quantized.py therefore
+        # measures a float-vs-int8 delta rather than a quality score.
+        final_epochs = max(1, round(float(np.mean(best_epochs))))
+        mlflow.log_param("final_fit_epochs", final_epochs)
+        mlflow.log_param("final_fit_chunks", int(len(y)))
+        print(
+            f"refitting on all {len(y)} chunks for {final_epochs} epochs "
+            f"(mean best epoch across folds: {np.mean(best_epochs):.1f})"
+        )
+
+        keras.utils.set_random_seed(training["random_state"])
+        mean, std = normalization_stats(X)
+        X_full = (X - mean) / std
+
+        model = build_and_compile(X_full.shape[1:], model_params)
+        mlflow.log_param("n_model_params", model.count_params())
+        # No EarlyStopping: there is no validation split to monitor. The epoch
+        # count comes from where the CV folds actually converged, which is the
+        # only unbiased estimate available here.
+        model.fit(
+            X_full,
+            y,
+            epochs=final_epochs,
+            batch_size=model_params["batch_size"],
+            verbose=2,
+        )
+
+        y_full_pred = (model.predict(X_full, verbose=0)[:, 0] > 0.5).astype(int)
+        # Named to keep it unmistakable that this is in-sample: it is a
+        # did-it-fit check, not a performance claim.
+        mlflow.log_metrics(compute_metrics(y, y_full_pred, "insample_full"))
 
         MODEL_PATH.parent.mkdir(parents=True, exist_ok=True)
         model.save(MODEL_PATH)

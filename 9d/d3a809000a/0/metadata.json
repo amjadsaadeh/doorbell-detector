@@ -1,0 +1,53 @@
+{
+  "cli_version": "0.8.42",
+  "checkpoint_id": "9dd3a809000a",
+  "session_id": "b8ba1f78-979a-4187-b0de-3af3acf4920c",
+  "strategy": "manual-commit",
+  "created_at": "2026-07-26T05:56:03.339148642Z",
+  "branch": "unified-pipeline",
+  "checkpoints_count": 2,
+  "files_touched": [
+    "src/train_xgboost.py"
+  ],
+  "agent": "Claude Code",
+  "model": "",
+  "turn_id": "aff26e8d45a7",
+  "checkpoint_transcript_start": 768,
+  "transcript_lines_at_start": 768,
+  "compact_transcript_start": 184,
+  "token_usage": {
+    "input_tokens": 13,
+    "cache_creation_tokens": 342997,
+    "cache_read_tokens": 2031827,
+    "output_tokens": 4802,
+    "api_call_count": 7
+  },
+  "session_metrics": {
+    "turn_count": 14
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-07-26T05:56:03.206760613Z",
+    "agent_lines": 15,
+    "agent_removed": 3,
+    "human_added": 0,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 15,
+    "total_lines_changed": 18,
+    "agent_percentage": 100,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 21,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        ".claude/scheduled_tasks.lock": 1,
+        ".claude/settings.local.json": 20
+      }
+    }
+  ]
+}

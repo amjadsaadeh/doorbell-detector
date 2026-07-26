@@ -1,0 +1,26 @@
+{
+  "cli_version": "0.8.42",
+  "checkpoint_id": "9dd3a809000a",
+  "strategy": "manual-commit",
+  "branch": "unified-pipeline",
+  "checkpoints_count": 2,
+  "files_touched": [
+    "src/train_xgboost.py"
+  ],
+  "sessions": [
+    {
+      "metadata": "/9d/d3a809000a/0/metadata.json",
+      "transcript": "/9d/d3a809000a/0/full.jsonl",
+      "compact_transcript": "/9d/d3a809000a/0/transcript.jsonl",
+      "content_hash": "/9d/d3a809000a/0/content_hash.txt",
+      "prompt": "/9d/d3a809000a/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 13,
+    "cache_creation_tokens": 342997,
+    "cache_read_tokens": 2031827,
+    "output_tokens": 4802,
+    "api_call_count": 7
+  }
+}

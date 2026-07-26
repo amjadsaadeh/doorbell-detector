@@ -13,17 +13,14 @@ train_xgboost.py so runs stay comparable across model families.
 
 import hashlib
 import os
-from pathlib import Path
 
 import matplotlib.pyplot as plt
 import mlflow
 import numpy as np
-import pandas as pd
 import yaml
 from sklearn.metrics import ConfusionMatrixDisplay
-from sklearn.preprocessing import LabelEncoder
 
-from features import get_spec
+from dataset import load_dataset
 from paths import DATA_FILE, MODEL_DIR
 from splits import aggregate_fold_metrics, iter_folds
 from train_xgboost import (
@@ -34,38 +31,6 @@ from train_xgboost import (
 )
 
 MODEL_PATH = MODEL_DIR / "cnn_model.keras"
-
-
-def prepare_data(df: pd.DataFrame):
-    """Like train_xgboost.prepare_data, but keeps the chunks 2D (adding a
-    trailing channel axis) instead of flattening them."""
-    feature_col = next(c for c in df.columns if c.endswith("_features"))
-    X = np.stack([np.asarray(x, dtype=np.float32) for x in df[feature_col]])
-    X = X[..., np.newaxis]
-    le = LabelEncoder()
-    df["label"] = df["label"].apply(
-        lambda x: "background" if x == "background" else "bell"
-    )
-    y = le.fit_transform(df["label"])
-    return X, y, le, feature_col.removesuffix("_features")
-
-
-def load_dataset(params: dict):
-    """Load balanced_data.h5 and apply the branch's log-compression setting.
-
-    Shared with export_tflite.py so the exported model is calibrated and
-    scored on exactly the tensors it was trained on.
-    """
-    df = pd.read_hdf(DATA_FILE, key="data")
-    X, y, le, feature_type = prepare_data(df)
-
-    # Whether this is needed is a property of the representation, declared
-    # in features.py, not a flag someone has to remember to flip.
-    if get_spec(params["feature_extraction"]["type"]).needs_log_compression:
-        X = np.log(X + 1e-6)
-
-    groups = df["split_group"].to_numpy()
-    return X, y, le, feature_type, groups
 
 
 def normalization_stats(X_train: np.ndarray) -> tuple[np.ndarray, np.ndarray]:

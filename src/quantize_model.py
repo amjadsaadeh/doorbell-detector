@@ -36,7 +36,8 @@ from paths import (
     MANIFEST_PATH,
 )
 from tflite_utils import C_ARRAY_VAR, build_export_model, convert_int8, write_c_array
-from train_cnn import MODEL_PATH, load_dataset
+from dataset import load_dataset
+from train_cnn import MODEL_PATH
 
 NORMALIZATION_PATH = MODEL_PATH.with_name("cnn_normalization.npz")
 TFLITE_PATH = EXPORT_DIR / "doorbell_int8.tflite"
@@ -110,7 +111,7 @@ def main():
         skip(f"training.head is {head!r}; int8 quantization needs the cnn head")
         return
 
-    # load_dataset -> prepare_data already appends the channel axis, so X is
+    # load_dataset appends the channel axis, so X is
     # (n, n_bins, n_frames, 1) here, and un-normalized: the Rescaling layer
     # added below is what consumes raw features, exactly like the firmware.
     X, _, _, _, _ = load_dataset(params)

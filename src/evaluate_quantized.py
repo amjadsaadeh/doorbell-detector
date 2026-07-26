@@ -42,7 +42,8 @@ from paths import (
 )
 from quantize_model import NORMALIZATION_PATH, TFLITE_PATH
 from tflite_utils import build_export_model, largest_activation_bytes, tflite_predict
-from train_cnn import MODEL_PATH, load_dataset
+from dataset import load_dataset
+from train_cnn import MODEL_PATH
 from train_xgboost import MLFLOW_EXPERIMENT_NAME, compute_metrics, get_git_branch
 
 WORST_DEVIATIONS_LOGGED = 20

@@ -69,6 +69,7 @@ A **feature representation and a model head are parameters, not branches** — y
 Two design points worth knowing before you change anything:
 
 - **`select_chunks` sits *before* `extract_features`.** It decides which chunks make up the dataset, so feature extraction only touches the ~1200 files actually used instead of all ~2800. It also takes no feature parameters, which means every feature variant trains on exactly the same chunks — that is what makes comparing them meaningful.
+- **`balanced_data.h5` is just the feature tensor.** One contiguous float32 array, row-aligned with `chunk_manifest.csv` — the metadata lives there, not duplicated in the HDF5. This also keeps the file byte-reproducible, so an unchanged pipeline genuinely skips retraining instead of rebuilding a model every run.
 - **`train_model` trains six models.** Five cross-validation folds produce the honest score (a mean with a standard deviation), and then a final model is refit on *all* the data — that last one is what ships. See [Reading the metrics](#reading-the-metrics).
 
 # Parameters

@@ -27,6 +27,14 @@ full parameter reference and the per-stage command list.
   `xgboost`. Sweep with `dvc exp run -S`, not by forking dvc.yaml. Historic branches
   (`cnn-mfcc`, `cnn-spectrogram`, `yamnet-features`, `stft-spectrogram-features`,
   `cnn-logmel`, `esp32-logmel`) each hard-coded one combination; they are superseded.
+- **`balanced_data.h5` holds one contiguous float32 array, nothing else.** Chunks used
+  to be a pandas object column of per-row arrays, which PyTables pickled into bytes that
+  differed run to run over identical data — so `draw_data` always looked changed to DVC
+  and `train_model` could never be skipped (~20 min per `dvc repro`, permanently). It is
+  now written with h5py and is byte-reproducible; `tests/dataset_test.py` asserts that.
+  The chunk metadata is deliberately **not** duplicated into it: `chunk_manifest.csv`
+  carries it row-for-row in the same order, and `src/dataset.py` enforces that the two
+  agree on length.
 - **`select_chunks` is deliberately feature-independent.** It decides which chunks make
   up the dataset and in what order, writes `data/chunk_manifest.csv`, and takes no
   `feature_extraction` param — so every variant trains on exactly the same chunks and
@@ -91,8 +99,8 @@ full parameter reference and the per-stage command list.
   to MLflow (experiment `doorbell-detector`) at `MLFLOW_TRACKING_URI` — a self-hosted
   server (`https://mlflow.saadeh.dev`), not managed from this repo. `dvc metrics
   show`/`dvc plots diff` no longer cover training metrics; check the MLflow UI instead.
-  Runs are named `<head>-<feature_type>-<git_branch>` (feature type auto-detected from
-  the `*_features` column in `balanced_data.h5`) and log `balanced_data_md5` — the md5
+  Runs are named `<head>-<feature_type>-<git_branch>` (feature type read from the
+  `feature_type` attribute of `balanced_data.h5`) and log `balanced_data_md5` — the md5
   DVC records for the dataset — so every run traces to an exact, `dvc pull`-able
   dataset version.
 - **Label Studio auth** is a JWT personal access token: `fetch_data.sh` exchanges it
@@ -215,6 +223,7 @@ matching, GPIO button trigger, Prometheus metrics/health endpoint.
 | `src/features.py` | Feature registry: transform + chunk slicer per `feature_extraction.type` |
 | `src/extract_features.py` | Driver: extracts the configured type for manifest-referenced files only |
 | `src/draw_data.py` | Slices features onto the manifest → `balanced_data.h5` |
+| `src/dataset.py` | Reads/writes `balanced_data.h5`; the byte-reproducible container |
 | `src/train_model.py` | Head dispatcher (`training.head`) + feature/head compatibility check |
 | `src/train_cnn.py` | Small keyword-spotting CNN, MLflow tracking |
 | `src/train_xgboost.py` | XGBoost head, MLflow tracking, shared metric/quality helpers |

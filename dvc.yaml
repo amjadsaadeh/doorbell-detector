@@ -121,6 +121,7 @@ stages:
     - data/chunk_manifest.csv
     - ${feature_extraction.features_dir}
     - src/draw_data.py
+    - src/dataset.py
     - src/features.py
     - src/paths.py
     params:
@@ -139,6 +140,7 @@ stages:
     - src/train_model.py
     - src/train_cnn.py
     - src/train_xgboost.py
+    - src/dataset.py
     - src/features.py
     - src/paths.py
     params:
@@ -158,7 +160,7 @@ stages:
     - src/quantize_model.py
     - src/tflite_utils.py
     - src/train_cnn.py
-    - src/splits.py
+    - src/dataset.py
     - src/paths.py
     params:
     - quantization.calibration_samples
@@ -181,7 +183,7 @@ stages:
     - src/tflite_utils.py
     - src/train_cnn.py
     - src/train_xgboost.py
-    - src/splits.py
+    - src/dataset.py
     - src/paths.py
     params:
     - quantization

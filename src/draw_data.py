@@ -5,10 +5,9 @@ select_chunks.py; what is left here is purely "slice the arrays and write
 the HDF5". That split is what lets one sampling decision be shared by every
 feature variant.
 
-The features column is named after the representation that produced it
-(mfcc_features, logmel_features, ...) because train_cnn.py and
-train_xgboost.py auto-detect the single *_features column and use its prefix
-as the MLflow feature_type.
+Output is a single contiguous float32 array row-aligned with
+chunk_manifest.csv, written by dataset.py -- which explains why the chunk
+metadata is deliberately not duplicated into it.
 """
 
 from pathlib import Path
@@ -19,6 +18,7 @@ import yaml
 from pandarallel import pandarallel
 from tqdm import tqdm
 
+from dataset import write_dataset
 from features import get_spec, verify_feature_config
 from paths import DATA_FILE, MANIFEST_PATH
 
@@ -45,8 +45,7 @@ def main():
 
     balanced_df = pd.read_csv(MANIFEST_PATH)
 
-    features_column = f"{feature_type}_features"
-    balanced_df[features_column] = balanced_df.parallel_apply(
+    chunks = balanced_df.parallel_apply(
         lambda row: spec.slice_chunk(
             load_features(row["audio_file_name"], features_dir),
             row["chunk_start"],
@@ -56,15 +55,16 @@ def main():
         axis=1,
     )
 
-    shapes = {f.shape for f in balanced_df[features_column]}
+    shapes = {f.shape for f in chunks}
     if len(shapes) != 1:
         raise SystemExit(
             f"inconsistent chunk shapes from {features_dir}: {sorted(shapes)}. "
             f"The trainer stacks these, so they all have to agree."
         )
 
-    DATA_FILE.parent.mkdir(parents=True, exist_ok=True)
-    balanced_df.to_hdf(DATA_FILE, key="data", index=False)
+    # Row-aligned with chunk_manifest.csv, which is the only place the chunk
+    # metadata lives now -- see dataset.py for why it is not duplicated here.
+    write_dataset(np.stack(chunks.to_numpy()), feature_type)
     print(f"{len(balanced_df)} chunks of shape {shapes.pop()} -> {DATA_FILE}")
 
 

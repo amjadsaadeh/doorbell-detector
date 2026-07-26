@@ -1,25 +1,8 @@
 import unittest
 
 import numpy as np
-import pandas as pd
 
-from src.train_cnn import build_model, normalization_stats, prepare_data
-
-
-class TestPrepareData(unittest.TestCase):
-
-    def test_stacks_2d_chunks_with_channel_axis(self):
-        df = pd.DataFrame(
-            {
-                "mfcc_features": [np.zeros((13, 62)), np.ones((13, 62))],
-                "label": ["background", "front_doorbell"],
-            }
-        )
-        X, y, le, feature_type = prepare_data(df)
-        self.assertEqual(X.shape, (2, 13, 62, 1))
-        self.assertEqual(feature_type, "mfcc")
-        # background=0, bell=1 (alphabetical LabelEncoder order)
-        np.testing.assert_array_equal(y, [0, 1])
+from src.train_cnn import build_model, normalization_stats
 
 
 class TestNormalizationStats(unittest.TestCase):

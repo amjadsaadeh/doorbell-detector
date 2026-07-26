@@ -2,18 +2,16 @@ import hashlib
 import json
 import os
 import subprocess
-from pathlib import Path
 
 import matplotlib.pyplot as plt
 import mlflow
 import mlflow.xgboost
 import numpy as np
-import pandas as pd
 import xgboost as xgb
 import yaml
 from sklearn.metrics import ConfusionMatrixDisplay, classification_report
-from sklearn.preprocessing import LabelEncoder
 
+from dataset import load_dataset
 from paths import DATA_FILE, DATA_QUALITY_DIR, MODEL_DIR
 from splits import aggregate_fold_metrics, iter_folds
 
@@ -71,24 +69,6 @@ def get_git_branch():
     return result.stdout.strip() or "unknown"
 
 
-def prepare_data(df):
-    # The feature column is named after the representation that produced it
-    # (mfcc_features, stft_features, ...) — detect it so this script works
-    # unchanged across feature-extraction variants/branches, and surface the
-    # type for run naming.
-    feature_col = next(c for c in df.columns if c.endswith("_features"))
-    # Convert features to 1D arrays
-    X = np.vstack([x.flatten() for x in df[feature_col]])
-    # Convert labels to binary (background=0, non-background=1)
-    le = LabelEncoder()
-    # Convert to inary problem
-    df["label"] = df["label"].apply(
-        lambda x: "background" if x == "background" else "bell"
-    )
-    y = le.fit_transform(df["label"])
-    return X, y, le, feature_col.removesuffix("_features")
-
-
 def main():
 
     with open("params.yaml", "r") as file:
@@ -97,12 +77,9 @@ def main():
     model_params = params["model"]["xgboost"]
     training = params["training"]
 
-    # Load data
-    df = pd.read_hdf(DATA_FILE, key="data")
-    X, y, le, feature_type = prepare_data(df)
-    # Group-aware CV; iter_folds owns the leakage argument and the
-    # why-not-one-fold argument (see train_cnn.py).
-    groups = df["split_group"].to_numpy()
+    # Flattened: the tree head has no use for the (bins, frames) structure.
+    # iter_folds owns the leakage argument and the why-not-one-fold argument.
+    X, y, le, feature_type, groups = load_dataset(params, flatten=True)
 
     mlflow.set_tracking_uri(os.environ["MLFLOW_TRACKING_URI"])
     mlflow.set_experiment(MLFLOW_EXPERIMENT_NAME)

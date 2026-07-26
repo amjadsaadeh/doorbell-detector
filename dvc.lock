@@ -144,8 +144,8 @@ stages:
       size: 11506
     - path: src/paths.py
       hash: md5
-      md5: a03368e21b3148e0cd1a65b4c5c234da
-      size: 564
+      md5: 9b20177b78279a43db30616583d66eed
+      size: 1032
     params:
       params.yaml:
         feature_extraction:
@@ -168,7 +168,7 @@ stages:
     deps:
     - path: data/balanced_data.h5
       hash: md5
-      md5: e433ebbea9b538a5ef0a858d94757fdb
+      md5: c51ae1df793aaa71a7fa03905bbff7a8
       size: 29667272
     - path: data/data_quality/chunk_balanced_quality.json
       hash: md5
@@ -230,7 +230,7 @@ stages:
     outs:
     - path: models/trained
       hash: md5
-      md5: c70c102c5770be4b97bbad15c315bb9e.dir
+      md5: 98673bb9f75ab786624d9bfe647da2d6.dir
       size: 215459
       nfiles: 2
   draw_data:
@@ -255,8 +255,8 @@ stages:
       size: 11506
     - path: src/paths.py
       hash: md5
-      md5: a03368e21b3148e0cd1a65b4c5c234da
-      size: 564
+      md5: 9b20177b78279a43db30616583d66eed
+      size: 1032
     params:
       params.yaml:
         feature_extraction:
@@ -271,7 +271,7 @@ stages:
     outs:
     - path: data/balanced_data.h5
       hash: md5
-      md5: e433ebbea9b538a5ef0a858d94757fdb
+      md5: c51ae1df793aaa71a7fa03905bbff7a8
       size: 29667272
   augmentation:
     cmd: python src/augment_data.py
@@ -416,8 +416,8 @@ stages:
       size: 639
     - path: src/paths.py
       hash: md5
-      md5: a03368e21b3148e0cd1a65b4c5c234da
-      size: 564
+      md5: 9b20177b78279a43db30616583d66eed
+      size: 1032
     - path: src/select_chunks.py
       hash: md5
       md5: 9031b4de5fa00e76adc988adad64d8fa
@@ -503,7 +503,7 @@ stages:
     deps:
     - path: data/balanced_data.h5
       hash: md5
-      md5: e433ebbea9b538a5ef0a858d94757fdb
+      md5: c51ae1df793aaa71a7fa03905bbff7a8
       size: 29667272
     - path: data/chunk_manifest.csv
       hash: md5
@@ -511,7 +511,7 @@ stages:
       size: 261591
     - path: models/trained
       hash: md5
-      md5: c70c102c5770be4b97bbad15c315bb9e.dir
+      md5: 98673bb9f75ab786624d9bfe647da2d6.dir
       size: 215459
       nfiles: 2
     - path: src/paths.py
@@ -558,7 +558,7 @@ stages:
     deps:
     - path: data/balanced_data.h5
       hash: md5
-      md5: e433ebbea9b538a5ef0a858d94757fdb
+      md5: c51ae1df793aaa71a7fa03905bbff7a8
       size: 29667272
     - path: data/calibration
       hash: md5
@@ -572,7 +572,7 @@ stages:
       nfiles: 3
     - path: models/trained
       hash: md5
-      md5: c70c102c5770be4b97bbad15c315bb9e.dir
+      md5: 98673bb9f75ab786624d9bfe647da2d6.dir
       size: 215459
       nfiles: 2
     - path: src/evaluate_quantized.py

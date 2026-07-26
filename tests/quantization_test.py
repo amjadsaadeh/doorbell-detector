@@ -6,6 +6,7 @@ subset selection, since a mistake there is silent -- the model still
 quantizes, it is just calibrated on the wrong chunks.
 """
 
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -82,3 +83,90 @@ class TestQuantizationParams(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestGate(unittest.TestCase):
+    """The gate is the only check in the pipeline that can stop it, so its
+    boundary and its failure mode both matter."""
+
+    def test_drop_below_limit_passes(self):
+        from src.evaluate_quantized import gate_passed
+
+        self.assertTrue(gate_passed(0.005, 0.01))
+
+    def test_drop_above_limit_fails(self):
+        from src.evaluate_quantized import gate_passed
+
+        self.assertFalse(gate_passed(0.02, 0.01))
+
+    def test_drop_exactly_at_limit_passes(self):
+        from src.evaluate_quantized import gate_passed
+
+        self.assertTrue(gate_passed(0.01, 0.01))
+
+    def test_int8_scoring_higher_passes(self):
+        """A negative drop is int8 nudging a borderline chunk the right way
+        — noise, not grounds for blocking."""
+        from src.evaluate_quantized import gate_passed
+
+        self.assertTrue(gate_passed(-0.0006, 0.01))
+
+    def test_valid_failure_modes_accepted(self):
+        from src.evaluate_quantized import resolve_on_failure
+
+        for mode in ("fail", "warn"):
+            self.assertEqual(resolve_on_failure({"on_failure": mode}), mode)
+
+    def test_typo_is_rejected_rather_than_silently_advisory(self):
+        from src.evaluate_quantized import resolve_on_failure
+
+        with self.assertRaises(SystemExit) as ctx:
+            resolve_on_failure({"on_failure": "Fail"})
+        self.assertIn("Fail", str(ctx.exception))
+
+
+class TestDiagnostics(unittest.TestCase):
+    """What makes a gate failure diagnosable rather than just fatal."""
+
+    def setUp(self):
+        import pandas as pd
+
+        self.table = pd.DataFrame(
+            {
+                "row_index": range(5),
+                "audio_file_name": [f"f{i}.wav" for i in range(5)],
+                "float_pred": [0, 1, 1, 0, 1],
+                "int8_pred": [0, 0, 1, 1, 1],  # rows 1 and 3 flipped
+                "score_deviation": [0.01, 0.40, 0.02, 0.30, 0.05],
+            }
+        )
+
+    def test_disagreements_contain_only_flipped_chunks(self):
+        import pandas as pd
+        from src.evaluate_quantized import write_diagnostics
+
+        with tempfile.TemporaryDirectory() as tmp:
+            paths = write_diagnostics(self.table, Path(tmp))
+            flipped = pd.read_csv(paths[0])
+        self.assertEqual(sorted(flipped["row_index"]), [1, 3])
+
+    def test_worst_deviations_are_ranked(self):
+        import pandas as pd
+        from src.evaluate_quantized import write_diagnostics
+
+        with tempfile.TemporaryDirectory() as tmp:
+            paths = write_diagnostics(self.table, Path(tmp))
+            worst = pd.read_csv(paths[1])
+        self.assertEqual(list(worst["row_index"])[:2], [1, 3])
+
+    def test_agreeing_run_still_writes_an_empty_disagreement_file(self):
+        """The artifact must exist on a passing run too, so its absence
+        always means the stage did not get there."""
+        import pandas as pd
+        from src.evaluate_quantized import write_diagnostics
+
+        agreeing = self.table.assign(int8_pred=self.table["float_pred"])
+        with tempfile.TemporaryDirectory() as tmp:
+            paths = write_diagnostics(agreeing, Path(tmp))
+            self.assertTrue(paths[0].exists())
+            self.assertEqual(len(pd.read_csv(paths[0])), 0)

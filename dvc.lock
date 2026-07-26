@@ -577,8 +577,8 @@ stages:
       nfiles: 2
     - path: src/evaluate_quantized.py
       hash: md5
-      md5: 576bdf0181b41dcc905847b068b5eb87
-      size: 6907
+      md5: f5fa1f266f06ea12a68bbc9d26992c2c
+      size: 11892
     - path: src/paths.py
       hash: md5
       md5: 9b20177b78279a43db30616583d66eed
@@ -608,6 +608,7 @@ stages:
         quantization:
           calibration_samples: 500
           max_f1_drop: 0.01
+          on_failure: fail
         training:
           test_size: 0.2
           random_state: 42
@@ -616,5 +617,5 @@ stages:
     outs:
     - path: models/quantized_metrics.json
       hash: md5
-      md5: 2374bd1ea9c905261c497dc5a13d7159
-      size: 712
+      md5: dd4f85b5349793d764ab176348158846
+      size: 734

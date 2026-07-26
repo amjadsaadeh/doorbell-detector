@@ -14,5 +14,6 @@
     "scored_chunks": 1770,
     "tflite_bytes": 26976,
     "peak_activation_bytes": 128000,
-    "calibration_chunks": 500
+    "calibration_chunks": 500,
+    "gate_passed": 1
 }

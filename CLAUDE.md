@@ -58,7 +58,18 @@ to train an XGBoost bell classifier.
   md5 as a param, so a quantized model in MLflow can be matched to a DVC-tracked
   calibration set. `quantization.max_f1_drop` fails the stage on collapse.
 - **The quantized run measures a delta, not quality**, and is tagged
-  `metric_scope: in-sample float-vs-int8 delta` to say so. Comparing two versions of one
+  `metric_scope: in-sample float-vs-int8 delta` to say so. The verdict is recorded as
+  a `gate` tag and a `gate_passed` metric, and a breach ends the run as **FAILED** (the
+  raise happens inside the mlflow run context) — so the evidence outlives the dead
+  pipeline instead of only existing as a non-zero exit code. `quantization.on_failure`
+  switches between `fail` (default; stops the pipeline so a bad model cannot be pushed
+  and flashed) and `warn` (advisory, for deliberate exploration). Note the gate protects
+  the pipeline, not the filesystem: on failure the `.tflite` is still on disk.
+- **Every quantized run logs `diagnostics/`** — `disagreements.csv` (chunks where float
+  and int8 predict differently, joined to recording/offset/label) and
+  `worst_score_deviations.csv` (top 20 by |float-int8|). Aggregates say a regression
+  happened; these say where. Both are written even on a passing run, so their absence
+  always means the stage did not get that far. Comparing two versions of one
   model needs no held-out data, so it scores **all** chunks — which is the point.
   Measured on a single 183-chunk fold, `max_score_deviation` read 0.0078; across all
   1770 it is **0.0868**, an ~11x larger perturbation that the small fold simply could

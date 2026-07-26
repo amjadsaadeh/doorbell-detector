@@ -121,7 +121,16 @@ quantization:
   # Chunks drawn from the training fold to calibrate activation ranges. The
   # selection is written to data/calibration/ and tracked by DVC.
   calibration_samples: 500
-  # Hard gate: fail the export if int8 quantization costs more val F1 than
-  # this. Silent quantization collapse is the most likely way a variant
-  # produces a model that looks fine offline and does not work on device.
+  # Gate: fail if int8 quantization costs more in-sample F1 than this.
+  # Silent quantization collapse is the most likely way a variant produces a
+  # model that looks fine offline and does not work on device. Loose on
+  # purpose -- 0.01 is ~18 chunks of the 1770, well above the single-chunk
+  # noise a borderline sample produces, so it detects a collapse rather than
+  # drift. max_score_deviation is the sensitive number, and is observational.
   max_f1_drop: 0.01
+  # fail: a breach stops the pipeline, so a bad model cannot become the
+  # artifact that gets pushed and flashed. warn: log it and continue --
+  # deliberate exploration only, recorded here rather than in
+  # someone's shell history. Either way the MLflow run records the verdict and the per-chunk
+  # diagnostics, and a breach marks that run FAILED.
+  on_failure: fail

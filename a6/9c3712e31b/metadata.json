@@ -1,0 +1,32 @@
+{
+  "cli_version": "0.8.42",
+  "checkpoint_id": "a69c3712e31b",
+  "strategy": "manual-commit",
+  "branch": "unified-pipeline",
+  "checkpoints_count": 3,
+  "files_touched": [
+    "src/evaluate_quantized.py",
+    "src/quantize_model.py",
+    "src/splits.py",
+    "src/train_cnn.py",
+    "src/train_xgboost.py",
+    "tests/quantization_test.py",
+    "tests/select_chunks_test.py"
+  ],
+  "sessions": [
+    {
+      "metadata": "/a6/9c3712e31b/0/metadata.json",
+      "transcript": "/a6/9c3712e31b/0/full.jsonl",
+      "compact_transcript": "/a6/9c3712e31b/0/transcript.jsonl",
+      "content_hash": "/a6/9c3712e31b/0/content_hash.txt",
+      "prompt": "/a6/9c3712e31b/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 35,
+    "cache_creation_tokens": 40005,
+    "cache_read_tokens": 7524184,
+    "output_tokens": 23530,
+    "api_call_count": 19
+  }
+}

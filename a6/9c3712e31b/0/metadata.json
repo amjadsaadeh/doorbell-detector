@@ -1,0 +1,77 @@
+{
+  "cli_version": "0.8.42",
+  "checkpoint_id": "a69c3712e31b",
+  "session_id": "b8ba1f78-979a-4187-b0de-3af3acf4920c",
+  "strategy": "manual-commit",
+  "created_at": "2026-07-26T16:00:31.256781183Z",
+  "branch": "unified-pipeline",
+  "checkpoints_count": 3,
+  "save_step_count": 1,
+  "files_touched": [
+    "src/evaluate_quantized.py",
+    "src/quantize_model.py",
+    "src/splits.py",
+    "src/train_cnn.py",
+    "src/train_xgboost.py",
+    "tests/quantization_test.py",
+    "tests/select_chunks_test.py"
+  ],
+  "agent": "Claude Code",
+  "model": "",
+  "turn_id": "298a4ad4665f",
+  "checkpoint_transcript_start": 908,
+  "transcript_lines_at_start": 908,
+  "compact_transcript_start": 219,
+  "token_usage": {
+    "input_tokens": 35,
+    "cache_creation_tokens": 40005,
+    "cache_read_tokens": 7524184,
+    "output_tokens": 23530,
+    "api_call_count": 19
+  },
+  "session_metrics": {
+    "turn_count": 20
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-07-26T16:00:31.089192029Z",
+    "agent_lines": 95,
+    "agent_removed": 98,
+    "human_added": 20,
+    "human_modified": 52,
+    "human_removed": 0,
+    "total_committed": 167,
+    "total_lines_changed": 324,
+    "agent_percentage": 59.5679012345679,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 21,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        ".claude/scheduled_tasks.lock": 1,
+        ".claude/settings.local.json": 20
+      }
+    },
+    {
+      "checkpoint_number": 2,
+      "user_lines_added": 73,
+      "user_lines_removed": 52,
+      "agent_lines_added": 147,
+      "agent_lines_removed": 98,
+      "user_added_per_file": {
+        ".claude/scheduled_tasks.lock": 1,
+        ".claude/settings.local.json": 20,
+        "dvc.lock": 38,
+        "models/quantized_metrics.json": 14
+      },
+      "user_removed_per_file": {
+        "dvc.lock": 38,
+        "models/quantized_metrics.json": 14
+      }
+    }
+  ]
+}

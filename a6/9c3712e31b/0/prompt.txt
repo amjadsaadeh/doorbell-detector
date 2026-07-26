@@ -1,0 +1,5 @@
+i need some explainations: so you are tellong me the quantization currently does Not degrade model Performance? which model has been used, since you used Cross validation Düring Training and eval?
+
+---
+
+apply your proposal for the quantization. Run Training after eval on 100% of the data

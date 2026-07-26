@@ -1,0 +1,5 @@
+Push and commit
+
+---
+
+OK finally: Update the claude.md and also the readme.md. please Take into account thats the readme IS for Humans. add a comprehensicd list of params for the Pipeline and also what they affect. add a comprehensicd list of commands to repro the stages

@@ -106,9 +106,12 @@ def main():
 
     mlflow.set_tracking_uri(os.environ["MLFLOW_TRACKING_URI"])
     mlflow.set_experiment(MLFLOW_EXPERIMENT_NAME)
-    # log_models=False: one model per fold would be logged otherwise, and
-    # the deliverable is fold 0's, saved explicitly below.
-    mlflow.xgboost.autolog(log_datasets=False, log_models=False)
+    # Autologging is deliberately off. It re-logs params on every fit, and
+    # each fold trains with random_state + fold, so from fold 1 on MLflow
+    # rejected the whole logging batch ("Changing param values is not
+    # allowed"). The loss curve it used to provide is logged explicitly for
+    # fold 0 below, and the model is saved explicitly too.
+    mlflow.xgboost.autolog(disable=True)
 
     git_branch = get_git_branch()
 
@@ -170,6 +173,15 @@ def main():
 
             if fold == 0:
                 artifact = (model, y_test, y_pred)
+                # Per-round train/test curve, the replacement for what
+                # autolog used to emit. eval_set order above names these
+                # validation_0=train, validation_1=test.
+                for eval_name, eval_metrics in model.evals_result().items():
+                    for metric_name, values in eval_metrics.items():
+                        for step, value in enumerate(values):
+                            mlflow.log_metric(
+                                f"{eval_name}_{metric_name}", value, step=step
+                            )
 
         n_evaluated = len(val_per_fold)
         mlflow.log_param("n_eval_folds", n_evaluated)

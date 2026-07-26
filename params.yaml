@@ -114,11 +114,13 @@ model:
     learning_rate: 0.1
     eval_metric: ["logloss", "error"]
 
-# int8 TFLite export for the ESP32-S3. Runs for every variant so candidates
-# are ranked after quantization, not before; non-cnn heads record a skip.
-export:
-  # Chunks drawn from the training fold to calibrate activation ranges
-  representative_samples: 500
+# int8 quantization for the ESP32-S3, plus the evaluation that gates it. Runs
+# for every variant so candidates are ranked after quantization, not before;
+# non-cnn heads record a skip.
+quantization:
+  # Chunks drawn from the training fold to calibrate activation ranges. The
+  # selection is written to data/calibration/ and tracked by DVC.
+  calibration_samples: 500
   # Hard gate: fail the export if int8 quantization costs more val F1 than
   # this. Silent quantization collapse is the most likely way a variant
   # produces a model that looks fine offline and does not work on device.

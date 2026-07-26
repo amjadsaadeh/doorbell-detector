@@ -14,3 +14,12 @@ DATA_QUALITY_DIR = Path("./data/data_quality")
 
 MODEL_DIR = Path("./models/trained")
 EXPORT_DIR = Path("./models/export")
+
+# The chunks post-training quantization fits its activation ranges to. Tracked
+# by DVC because that choice is part of the quantized model, not a runtime
+# detail: same weights + same calibration chunks reproduce the same graph.
+CALIBRATION_DIR = Path("./data/calibration")
+CALIBRATION_CHUNKS = CALIBRATION_DIR / "calibration_chunks.npz"
+CALIBRATION_MANIFEST = CALIBRATION_DIR / "calibration_manifest.csv"
+
+QUANTIZED_METRICS = Path("./models/quantized_metrics.json")

@@ -16,7 +16,7 @@ to train an XGBoost bell classifier.
 `download_audio` (S3) → `extract_data_quality` / `augmentation` (SNR-mixed synthetic
 `front_doorbell` samples) → `select_chunks` (chunking + balancing) →
 `extract_features` → `draw_data` (slicing) → `train_model` (MLflow) →
-`export_model` (int8 TFLite).
+`quantize_model` (int8 TFLite) → `evaluate_quantized` (gate + MLflow).
 
 - **A feature/model variant is a parameter, not a branch.** `feature_extraction.type`
   picks an entry in `src/features.py` (`mfcc`, `logmel`, `stft`, `yamnet`) which owns
@@ -40,10 +40,26 @@ to train an XGBoost bell classifier.
   `dropout`/`epochs` as unknown kwargs and barely trained. Whether a representation
   needs log-compression before normalization is likewise a `FeatureSpec` property
   (`needs_log_compression`, true only for `stft`), not a params flag to remember.
-- **`export_model` runs for every variant**, so candidates are ranked on their
-  post-quantization score rather than their float32 one; `export.max_f1_drop` fails the
-  stage on quantization collapse. Non-`cnn` heads write `models/export/SKIPPED.json`
-  instead of a model.
+- **Quantization is two stages, deliberately.** `quantize_model` builds the int8
+  graph; `evaluate_quantized` scores it and decides whether it ships, so the thing
+  that gates the model is not the same code path that produced it. Both run for every
+  variant, so candidates are ranked post-quantization rather than on float32; non-`cnn`
+  heads write `SKIPPED.json` markers instead.
+- **The calibration subset is a tracked artifact** (`data/calibration/`, a DVC output).
+  Post-training quantization fits activation ranges to whatever chunks it is shown, so
+  that choice is part of the model: same weights + same calibration chunks reproduce
+  the same graph. It is drawn from the *training* fold only — calibrating on validation
+  chunks would tune the ranges to the data the next stage scores against — and the
+  saved `row_index` values are dataset-global, so they join straight back to
+  `chunk_manifest.csv` (`calibration_manifest.csv` is the human-readable view).
+- **`evaluate_quantized` logs its own MLflow run**, named after the training run with a
+  `-quantized` suffix (e.g. `cnn-logmel-unified-pipeline-quantized`, tagged
+  `stage=quantized`). It carries the calibration `.npz` + `.csv` as artifacts and its
+  md5 as a param, so a quantized model in MLflow can be matched to a DVC-tracked
+  calibration set. `quantization.max_f1_drop` fails the stage on collapse. Note the
+  float-vs-int8 comparison uses fold 0 only — the one split the saved model never saw —
+  so it is a quantization delta, not a model-quality claim; `f1_drop` is the number
+  that matters there.
 
 - **Storage layout:** bucket `doorbell-detector` on MinIO — `raw/` (audio, Label Studio
   source storage), `annotations/` (Label Studio target-storage sync, backup only),

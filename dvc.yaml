@@ -149,23 +149,45 @@ stages:
 
   # In the default DAG so candidates are ranked on their post-quantization
   # score; non-cnn heads write a skip marker instead of a model.
-  export_model:
-    cmd: python src/export_tflite.py
+  quantize_model:
+    cmd: python src/quantize_model.py
     deps:
     - data/balanced_data.h5
+    - data/chunk_manifest.csv
     - models/trained
-    - src/export_tflite.py
+    - src/quantize_model.py
+    - src/tflite_utils.py
     - src/train_cnn.py
-    - src/train_xgboost.py
+    - src/splits.py
     - src/paths.py
     params:
-    - export
-    - model.cnn
+    - quantization.calibration_samples
     - training
     outs:
     - models/export
+    - data/calibration
+
+  # Separate stage from the one that produced the model, so what decides
+  # whether it ships is not the same code path that built it.
+  evaluate_quantized:
+    cmd: python src/evaluate_quantized.py
+    deps:
+    - data/balanced_data.h5
+    - models/trained
+    - models/export
+    - data/calibration
+    - src/evaluate_quantized.py
+    - src/quantize_model.py
+    - src/tflite_utils.py
+    - src/train_cnn.py
+    - src/train_xgboost.py
+    - src/splits.py
+    - src/paths.py
+    params:
+    - quantization
+    - training
     metrics:
-    - models/tflite_metrics.json:
+    - models/quantized_metrics.json:
         cache: false
 
 metrics:

@@ -498,3 +498,123 @@ stages:
       hash: md5
       md5: 8ae1a58ab73838323c8e6edd8f73395e
       size: 582
+  quantize_model:
+    cmd: python src/quantize_model.py
+    deps:
+    - path: data/balanced_data.h5
+      hash: md5
+      md5: e433ebbea9b538a5ef0a858d94757fdb
+      size: 29667272
+    - path: data/chunk_manifest.csv
+      hash: md5
+      md5: dbc9fb19a9751195127ca6390593c8bc
+      size: 261591
+    - path: models/trained
+      hash: md5
+      md5: 26afc24c02fff25a639f0b2bbfa35edc.dir
+      size: 215369
+      nfiles: 2
+    - path: src/paths.py
+      hash: md5
+      md5: 9b20177b78279a43db30616583d66eed
+      size: 1032
+    - path: src/quantize_model.py
+      hash: md5
+      md5: d3dd9d613b41ab34d86bbd1323b5310b
+      size: 5217
+    - path: src/splits.py
+      hash: md5
+      md5: d1fcd45e35d1952f3de180675eabb825
+      size: 3111
+    - path: src/tflite_utils.py
+      hash: md5
+      md5: d627677952f29914a9af0051ae6a506c
+      size: 4654
+    - path: src/train_cnn.py
+      hash: md5
+      md5: 348a4912b1b213ff07bcb9a14603770f
+      size: 9364
+    params:
+      params.yaml:
+        quantization.calibration_samples: 500
+        training:
+          test_size: 0.2
+          random_state: 42
+          n_eval_folds:
+          head: cnn
+    outs:
+    - path: data/calibration
+      hash: md5
+      md5: b23bd8bd929fc4ff096d959c160f6963.dir
+      size: 6780827
+      nfiles: 2
+    - path: models/export
+      hash: md5
+      md5: 0e4099f440ceebdc1f1c812893040892.dir
+      size: 197687
+      nfiles: 3
+  evaluate_quantized:
+    cmd: python src/evaluate_quantized.py
+    deps:
+    - path: data/balanced_data.h5
+      hash: md5
+      md5: e433ebbea9b538a5ef0a858d94757fdb
+      size: 29667272
+    - path: data/calibration
+      hash: md5
+      md5: b23bd8bd929fc4ff096d959c160f6963.dir
+      size: 6780827
+      nfiles: 2
+    - path: models/export
+      hash: md5
+      md5: 0e4099f440ceebdc1f1c812893040892.dir
+      size: 197687
+      nfiles: 3
+    - path: models/trained
+      hash: md5
+      md5: 26afc24c02fff25a639f0b2bbfa35edc.dir
+      size: 215369
+      nfiles: 2
+    - path: src/evaluate_quantized.py
+      hash: md5
+      md5: 36ba5fe4b395198467e8202d330ef382
+      size: 6169
+    - path: src/paths.py
+      hash: md5
+      md5: 9b20177b78279a43db30616583d66eed
+      size: 1032
+    - path: src/quantize_model.py
+      hash: md5
+      md5: d3dd9d613b41ab34d86bbd1323b5310b
+      size: 5217
+    - path: src/splits.py
+      hash: md5
+      md5: d1fcd45e35d1952f3de180675eabb825
+      size: 3111
+    - path: src/tflite_utils.py
+      hash: md5
+      md5: d627677952f29914a9af0051ae6a506c
+      size: 4654
+    - path: src/train_cnn.py
+      hash: md5
+      md5: 348a4912b1b213ff07bcb9a14603770f
+      size: 9364
+    - path: src/train_xgboost.py
+      hash: md5
+      md5: 5afea4a7b0308f386143035235a155a5
+      size: 8763
+    params:
+      params.yaml:
+        quantization:
+          calibration_samples: 500
+          max_f1_drop: 0.01
+        training:
+          test_size: 0.2
+          random_state: 42
+          n_eval_folds:
+          head: cnn
+    outs:
+    - path: models/quantized_metrics.json
+      hash: md5
+      md5: af59d6ee7788674fe366246c7a7dd62c
+      size: 515

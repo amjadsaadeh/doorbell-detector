@@ -1,0 +1,35 @@
+{
+  "cli_version": "0.8.42",
+  "checkpoint_id": "33bedea749c4",
+  "strategy": "manual-commit",
+  "branch": "unified-pipeline",
+  "checkpoints_count": 2,
+  "files_touched": [
+    "dvc.lock",
+    "dvc.yaml",
+    "src/dataset.py",
+    "src/draw_data.py",
+    "src/evaluate_quantized.py",
+    "src/quantize_model.py",
+    "src/train_cnn.py",
+    "src/train_xgboost.py",
+    "tests/dataset_test.py",
+    "tests/train_cnn_test.py"
+  ],
+  "sessions": [
+    {
+      "metadata": "/33/bedea749c4/0/metadata.json",
+      "transcript": "/33/bedea749c4/0/full.jsonl",
+      "compact_transcript": "/33/bedea749c4/0/transcript.jsonl",
+      "content_hash": "/33/bedea749c4/0/content_hash.txt",
+      "prompt": "/33/bedea749c4/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 25,
+    "cache_creation_tokens": 19870,
+    "cache_read_tokens": 7153237,
+    "output_tokens": 16259,
+    "api_call_count": 14
+  }
+}

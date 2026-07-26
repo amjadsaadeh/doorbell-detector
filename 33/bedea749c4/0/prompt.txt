@@ -1,0 +1,1 @@
+ok fix this issue with draw_data

@@ -1,0 +1,78 @@
+{
+  "cli_version": "0.8.42",
+  "checkpoint_id": "33bedea749c4",
+  "session_id": "b8ba1f78-979a-4187-b0de-3af3acf4920c",
+  "strategy": "manual-commit",
+  "created_at": "2026-07-26T20:15:30.368601698Z",
+  "branch": "unified-pipeline",
+  "checkpoints_count": 2,
+  "save_step_count": 1,
+  "files_touched": [
+    "dvc.lock",
+    "dvc.yaml",
+    "src/dataset.py",
+    "src/draw_data.py",
+    "src/evaluate_quantized.py",
+    "src/quantize_model.py",
+    "src/train_cnn.py",
+    "src/train_xgboost.py",
+    "tests/dataset_test.py",
+    "tests/train_cnn_test.py"
+  ],
+  "agent": "Claude Code",
+  "model": "",
+  "turn_id": "ce0e8776ea87",
+  "checkpoint_transcript_start": 1220,
+  "transcript_lines_at_start": 1220,
+  "compact_transcript_start": 291,
+  "token_usage": {
+    "input_tokens": 25,
+    "cache_creation_tokens": 19870,
+    "cache_read_tokens": 7153237,
+    "output_tokens": 16259,
+    "api_call_count": 14
+  },
+  "session_metrics": {
+    "turn_count": 30
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-07-26T20:15:30.128246301Z",
+    "agent_lines": 144,
+    "agent_removed": 66,
+    "human_added": 20,
+    "human_modified": 66,
+    "human_removed": 0,
+    "total_committed": 197,
+    "total_lines_changed": 298,
+    "agent_percentage": 70.46979865771812,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 21,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        ".claude/scheduled_tasks.lock": 1,
+        ".claude/settings.local.json": 20
+      }
+    },
+    {
+      "checkpoint_number": 2,
+      "user_lines_added": 58,
+      "user_lines_removed": 33,
+      "agent_lines_added": 214,
+      "agent_lines_removed": 99,
+      "user_added_per_file": {
+        ".claude/scheduled_tasks.lock": 1,
+        ".claude/settings.local.json": 20,
+        "dvc.lock": 37
+      },
+      "user_removed_per_file": {
+        "dvc.lock": 33
+      }
+    }
+  ]
+}

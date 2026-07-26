@@ -6,8 +6,11 @@ Audio-based doorbell detection system running on a Raspberry Pi. The project has
 main modes: an ML-based collector (`data_collection/data_collector.py`) and a
 pattern-matching detector (`data_collection/detector.py`), deployed as a systemd
 service. Alongside the Pi scripts lives a DVC-managed ML pipeline (`src/`, `dvc.yaml`)
-that pulls labels from Label Studio and raw audio from a self-hosted MinIO S3 bucket
-to train an XGBoost bell classifier.
+that pulls labels from Label Studio and raw audio from a self-hosted MinIO S3 bucket,
+trains a small log-mel CNN, and exports an int8 TFLite model sized for an ESP32-S3.
+The XGBoost head is still selectable (`training.head`) but is now the baseline, not
+the default. README.md is the human-facing counterpart to this file: it carries the
+full parameter reference and the per-stage command list.
 
 ## ML Data Pipeline (DVC)
 
@@ -215,7 +218,10 @@ matching, GPIO button trigger, Prometheus metrics/health endpoint.
 | `src/train_model.py` | Head dispatcher (`training.head`) + feature/head compatibility check |
 | `src/train_cnn.py` | Small keyword-spotting CNN, MLflow tracking |
 | `src/train_xgboost.py` | XGBoost head, MLflow tracking, shared metric/quality helpers |
-| `src/export_tflite.py` | int8 TFLite + C array export, gated on `export.max_f1_drop` |
+| `src/splits.py` | Group-aware CV folds + fold-metric aggregation, shared by both heads |
+| `src/tflite_utils.py` | Pure TFLite helpers (wrap, convert, interpret, C array) |
+| `src/quantize_model.py` | int8 conversion + the DVC-tracked calibration set |
+| `src/evaluate_quantized.py` | float-vs-int8 delta, the gate, and its diagnostics |
 | `src/paths.py` | Canonical artifact locations shared by the stage scripts |
 | `params.yaml` | ML pipeline parameters (not used by detector) |
 | `.env` | Git-ignored credentials for Label Studio + MinIO + MLflow |

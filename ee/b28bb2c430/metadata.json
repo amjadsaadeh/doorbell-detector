@@ -1,0 +1,26 @@
+{
+  "cli_version": "0.8.42",
+  "checkpoint_id": "eeb28bb2c430",
+  "strategy": "manual-commit",
+  "branch": "unified-pipeline",
+  "checkpoints_count": 4,
+  "files_touched": [
+    "src/evaluate_quantized.py"
+  ],
+  "sessions": [
+    {
+      "metadata": "/ee/b28bb2c430/0/metadata.json",
+      "transcript": "/ee/b28bb2c430/0/full.jsonl",
+      "compact_transcript": "/ee/b28bb2c430/0/transcript.jsonl",
+      "content_hash": "/ee/b28bb2c430/0/content_hash.txt",
+      "prompt": "/ee/b28bb2c430/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 34,
+    "cache_creation_tokens": 29454,
+    "cache_read_tokens": 7867017,
+    "output_tokens": 25412,
+    "api_call_count": 18
+  }
+}

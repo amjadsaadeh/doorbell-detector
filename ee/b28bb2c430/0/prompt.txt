@@ -1,0 +1,13 @@
+Last question: whats the meaning of Gate in this context?
+
+---
+
+whats the threhold for the quantization?
+
+---
+
+may IT BE suitable to log the failure in mlflow insteadmof.failing the Pipeline? so i persistes the failure permanently and track down the source why IT IS marked as failure?
+
+---
+
+yes

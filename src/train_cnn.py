@@ -21,6 +21,7 @@ import yaml
 from sklearn.metrics import ConfusionMatrixDisplay
 
 from dataset import load_dataset
+from oof import DECISION_THRESHOLD, OutOfFoldPredictions
 from paths import DATA_FILE, MODEL_DIR
 from splits import aggregate_fold_metrics, iter_folds
 from train_xgboost import (
@@ -111,6 +112,10 @@ def main():
 
         val_per_fold, train_per_fold, test_fractions, best_epochs = [], [], [], []
         fold0_eval = None
+        # Every fold's held-out scores, kept per chunk rather than collapsed
+        # into a metric -- the only honest per-sample record this pipeline
+        # produces, and the input to src/inspect_dataset.py.
+        oof = OutOfFoldPredictions(len(y))
 
         for fold, train_idx, test_idx, n_splits in iter_folds(
             X, y, groups, training["test_size"], training["n_eval_folds"]
@@ -149,8 +154,14 @@ def main():
                 verbose=2,
             )
 
-            y_pred = (model.predict(X_test, verbose=0)[:, 0] > 0.5).astype(int)
-            y_train_pred = (model.predict(X_train, verbose=0)[:, 0] > 0.5).astype(int)
+            # Keep the raw sigmoid, not just the thresholded label: how close
+            # a chunk sat to the boundary is what the inspector filters on.
+            val_scores = model.predict(X_test, verbose=0)[:, 0]
+            y_pred = (val_scores > DECISION_THRESHOLD).astype(int)
+            y_train_pred = (
+                model.predict(X_train, verbose=0)[:, 0] > DECISION_THRESHOLD
+            ).astype(int)
+            oof.add(fold, test_idx, y_test, val_scores)
 
             fold_val = compute_metrics(y_test, y_pred, "val")
             fold_train = compute_metrics(y_train, y_train_pred, "train")
@@ -194,6 +205,18 @@ def main():
             f"{val_summary['val_f1_score']:.4f} "
             f"+/- {val_summary['val_f1_score_std']:.4f} "
             f"(worst {val_summary['val_f1_score_min']:.4f})"
+        )
+
+        oof_path = oof.write()
+        oof_summary = oof.summary()
+        mlflow.log_metrics(oof_summary)
+        # Also an MLflow artifact, not only a DVC output: the run that scored
+        # these chunks is the one whose errors they are.
+        mlflow.log_artifact(oof_path, artifact_path="predictions")
+        print(
+            f"out-of-fold: {int(oof_summary['oof_errors'])} errors on "
+            f"{int(oof_summary['oof_chunks'])} held-out chunks "
+            f"({oof_summary['oof_coverage']:.0%} of the dataset) -> {oof_path}"
         )
 
         y_test, y_pred = fold0_eval

@@ -27,7 +27,6 @@ augmentation:
   - 5
   - 10
   - 15
-  # How many random noise chunks to pair with each real doorbell chunk, per SNR
   pairs_per_signal_chunk: 2
   # Uniform loudness jitter (+/- dB) applied to each mixed sample so synthetic
   # positives vary in absolute level, not just SNR
@@ -55,28 +54,12 @@ noise_pools:
     - DLIVING
     - DWASHING
     - OHALLWAY
-
-# Which feature representation to build. `type` selects an entry in
-# src/features.py, which owns both the transform and the matching chunk
-# slicer; the remaining keys are that entry's parameters. Swapping
-# representation is `dvc exp run -S feature_extraction.type=...` rather than
-# a branch — see the variant table in README/CLAUDE.md.
-#
-# The default geometry targets ESP32-S3 inference: the first conv activation
-# (n_mels x n_frames x 32) is what has to fit in SRAM, and 40x100 lands at
-# ~125 KB int8 (internal SRAM) vs ~1 MB for the 129x250 STFT variant.
-# hop_length 320 = 20 ms, so a 2000 ms chunk is exactly 100 frames.
-#
-# features_dir must be distinct per geometry, so variants can coexist on
-# disk. extract_features.py stamps a feature_config.json into it and
-# draw_data.py refuses to slice arrays whose stamp disagrees with these
-# params, which is the backstop if two configs ever do share a directory.
 feature_extraction:
-  type: logmel
-  features_dir: ./data/features/logmel-40mel-320hop
+  type: stft
+  features_dir: ./data/features/stft-256fft-128hop
   n_mels: 40
-  n_fft: 512 # 32 ms @ 16 kHz
-  hop_length: 320 # 20 ms
+  n_fft: 256 # 32 ms @ 16 kHz
+  hop_length: 128 # 20 ms
   fmin: 50
   fmax: 8000
   log_offset: 1.0e-6
@@ -90,7 +73,7 @@ training:
   # (1/test_size), which is what makes val_f1_score a mean with a _std
   # rather than one lucky split. Set to 1 for a fast iteration loop --
   # it reproduces the old single-fold behaviour, at the old credibility.
-  n_eval_folds: null
+  n_eval_folds:
   # Which model family trains on the chunks: `cnn` (src/train_cnn.py) keeps
   # the 2D (bins, frames) structure, `xgboost` (src/train_xgboost.py)
   # flattens it. yamnet features only work with the xgboost head — its
@@ -112,7 +95,9 @@ model:
     n_estimators: 25
     max_depth: 6
     learning_rate: 0.1
-    eval_metric: ["logloss", "error"]
+    eval_metric:
+    - logloss
+    - error
 
 # int8 quantization for the ESP32-S3, plus the evaluation that gates it. Runs
 # for every variant so candidates are ranked after quantization, not before;

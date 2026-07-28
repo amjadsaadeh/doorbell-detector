@@ -165,6 +165,41 @@ full parameter reference and the per-stage command list.
   generalization estimate is `val_f1_score` (± `_std`) on the training run, full stop.
   If you ever need a held-out number for the shipped model, carve out a fixed holdout
   before CV — do not read one out of the quantization stage.
+- **The folds' held-out predictions survive the run** as `data/predictions/oof_predictions.csv`
+  (`src/oof.py`, a DVC out of `train_model`, also an MLflow artifact under
+  `predictions/`). It is the *only* honest per-chunk record the pipeline produces:
+  every score comes from the fold model that did not train on that chunk, whereas
+  the shipped refit has seen everything, so its errors are memorization failures.
+  It cannot be recomputed after the fact — the fold models are gone. Columns are
+  `outcome` (TP/TN/FP/FN), `y_score`, `margin` (distance from the 0.5 threshold),
+  `fold`, plus the provenance from `src/provenance.py`. Coverage is complete only
+  when `training.n_eval_folds` is null; `oof_coverage` in MLflow records what it was.
+- **`src/provenance.py` is the single definition of "where a chunk came from"** —
+  annotation id, file, ms offsets, label, split_group, snr_db, noise_pool, keyed by
+  the dataset-global `row_index`. Both the OOF table and `evaluate_quantized`'s
+  `diagnostics/` use it, so a chunk is described identically wherever it turns up.
+  Anything new that reports per-chunk numbers should join through it rather than
+  re-picking manifest columns.
+- **`src/inspect_dataset.py` + `src/inspect_dataset.sh` browse the dataset by
+  outcome** in Renumics Spotlight: filterable table, audio player, spectrogram,
+  optional CNN-embedding similarity map (`--embeddings`). Deliberately **not** a DVC
+  stage — it reads pipeline outputs and builds `data/spotlight/`, a git-ignored,
+  untracked cache (one wav per chunk, ~110 MB) that can be deleted at any time.
+  `prepare` cuts the wavs, `show` serves them; the wrapper runs both.
+- **Spotlight is what dragged `librosa` to 0.11 and `pyarrow` to 24** (plus
+  `dill` down to <0.3.9, which HuggingFace `datasets` requires). Bumping a
+  feature-extraction dependency under a cached dataset is a silent-corruption risk,
+  so it was **measured, not assumed**: log-mel, MFCC and STFT features are
+  **bit-identical** between librosa 0.10.2.post1 and 0.11.0 at this project's
+  parameters (verified on a real recording, md5 of the float32 array). Nothing in
+  `data/features/` was invalidated. Re-run that comparison before the next librosa
+  bump rather than trusting it to keep holding.
+- **Spotlight gotcha:** it builds a Category's value list by sorting the column's
+  uniques, so a single `None` beside the strings raises
+  `TypeError: '<' not supported` from inside the server process, far from the cause.
+  `name_the_gaps()` fills those with `n/a` before the parquet is written — `noise_pool`
+  is empty for non-pool chunks, and under `--all-chunks` every prediction column is
+  empty for chunks no fold held out.
 
 ## GSD Workflow
 
@@ -203,7 +238,7 @@ matching, GPIO button trigger, Prometheus metrics/health endpoint.
 - Cross-correlation is slow enough to drop audio in saved clips if not handled carefully (see `c8c2788`)
 - Root `requirements.txt` was removed — `pyproject.toml`/`uv.lock` is the single source
   of pipeline dependencies (`data_collection/requirements.txt` remains for the Pi)
-- All 44 tests pass; run with `PYTHONPATH=./src:. uv run pytest tests/`
+- All 146 tests pass; run with `PYTHONPATH=./src:. uv run pytest tests/`
 
 ## Key Files
 
@@ -228,6 +263,10 @@ matching, GPIO button trigger, Prometheus metrics/health endpoint.
 | `src/train_cnn.py` | Small keyword-spotting CNN, MLflow tracking |
 | `src/train_xgboost.py` | XGBoost head, MLflow tracking, shared metric/quality helpers |
 | `src/splits.py` | Group-aware CV folds + fold-metric aggregation, shared by both heads |
+| `src/oof.py` | Held-out per-chunk predictions collected across the CV folds |
+| `src/provenance.py` | Where a chunk came from: the manifest join every per-chunk diagnostic uses |
+| `src/inspect_dataset.py` | Spotlight inspector: prepare (project env) + show (isolated env) |
+| `src/inspect_dataset.sh` | Runs both halves in order — the entry point |
 | `src/tflite_utils.py` | Pure TFLite helpers (wrap, convert, interpret, C array) |
 | `src/quantize_model.py` | int8 conversion + the DVC-tracked calibration set |
 | `src/evaluate_quantized.py` | float-vs-int8 delta, the gate, and its diagnostics |
@@ -249,6 +288,7 @@ uv run dvc repro                  # run/refresh the pipeline (labels NOT re-fetc
 uv run dvc repro -f fetch_labeled_data && uv run dvc repro   # refresh labels too
 uv run dvc push                   # push data/model versions to MinIO
 PYTHONPATH=./src:. uv run pytest tests/
+./src/inspect_dataset.sh          # browse chunks by prediction outcome (Spotlight)
 ```
 
 Feature/model variants (`select_chunks` and everything above it stays cached):

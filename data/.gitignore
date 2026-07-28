@@ -15,3 +15,5 @@
 /augmented_annotations.csv
 /chunk_manifest.csv
 /calibration
+/predictions
+/spotlight

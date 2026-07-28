@@ -1,0 +1,52 @@
+{
+  "cli_version": "0.8.42",
+  "checkpoint_id": "90d01191843d",
+  "session_id": "9fd766cb-0465-4058-86be-0795346e2328",
+  "strategy": "manual-commit",
+  "created_at": "2026-07-28T12:37:12.373628533Z",
+  "branch": "unified-pipeline",
+  "checkpoints_count": 14,
+  "save_step_count": 1,
+  "files_touched": [
+    "CLAUDE.md",
+    "README.md",
+    "data/.gitignore",
+    "dvc.lock",
+    "dvc.yaml",
+    "src/evaluate_quantized.py",
+    "src/inspect_dataset.py",
+    "src/inspect_dataset.sh",
+    "src/oof.py",
+    "src/paths.py",
+    "src/provenance.py",
+    "src/train_cnn.py",
+    "src/train_xgboost.py",
+    "tests/oof_test.py"
+  ],
+  "agent": "Claude Code",
+  "model": "",
+  "turn_id": "dd5184a23174",
+  "compact_transcript_start": 0,
+  "token_usage": {
+    "input_tokens": 293,
+    "cache_creation_tokens": 443616,
+    "cache_read_tokens": 23867620,
+    "output_tokens": 113312,
+    "api_call_count": 156
+  },
+  "session_metrics": {
+    "turn_count": 14
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-07-28T12:37:12.270738946Z",
+    "agent_lines": 998,
+    "agent_removed": 52,
+    "human_added": 0,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 998,
+    "total_lines_changed": 1050,
+    "agent_percentage": 100,
+    "metric_version": 2
+  }
+}

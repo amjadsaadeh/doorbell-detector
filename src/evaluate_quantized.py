@@ -37,9 +37,9 @@ from paths import (
     CALIBRATION_CHUNKS,
     CALIBRATION_MANIFEST,
     DATA_FILE,
-    MANIFEST_PATH,
     QUANTIZED_METRICS,
 )
+from provenance import chunk_provenance
 from quantize_model import NORMALIZATION_PATH, TFLITE_PATH
 from tflite_utils import build_export_model, largest_activation_bytes, tflite_predict
 from dataset import load_dataset
@@ -119,19 +119,13 @@ def score_pair(export_model, tflite_model: bytes, X, y) -> tuple[dict, dict]:
 def chunk_diagnostics(y: np.ndarray, detail: dict) -> pd.DataFrame:
     """Per-chunk float-vs-int8 table joined to the chunks' provenance.
 
-    Aggregates cannot answer "why did the gate fire". This can: it names the
-    recording, the offset and the SNR variant behind every chunk where the
-    two models diverge, which is what distinguishes damage concentrated in
-    the deeply-buried augmented samples from damage spread evenly.
+    Aggregates cannot answer "why did the gate fire". This can: src/provenance.py
+    names the annotation, the recording, the offset and the SNR variant behind
+    every chunk where the two models diverge, which is what distinguishes
+    damage concentrated in the deeply-buried augmented samples from damage
+    spread evenly.
     """
-    manifest = pd.read_csv(MANIFEST_PATH)
-    columns = [
-        c
-        for c in ["audio_file_name", "chunk_start", "chunk_end", "label", "split_group"]
-        if c in manifest.columns
-    ]
-    table = manifest[columns].copy()
-    table.insert(0, "row_index", np.arange(len(table)))
+    table = chunk_provenance()
     table["true_label"] = y
     for name, values in detail.items():
         table[name] = values

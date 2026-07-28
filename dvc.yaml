@@ -142,12 +142,18 @@ stages:
     - src/train_xgboost.py
     - src/dataset.py
     - src/features.py
+    - src/oof.py
+    - src/provenance.py
     - src/paths.py
     params:
     - model
     - training
     outs:
     - models/trained
+    # Held-out per-chunk predictions. Tracked because they can only be
+    # produced inside the fold loop: the shipped model is refit on
+    # everything, so no later stage can recompute an honest one.
+    - data/predictions
 
   # In the default DAG so candidates are ranked on their post-quantization
   # score; non-cnn heads write a skip marker instead of a model.
@@ -184,6 +190,7 @@ stages:
     - src/train_cnn.py
     - src/train_xgboost.py
     - src/dataset.py
+    - src/provenance.py
     - src/paths.py
     params:
     - quantization

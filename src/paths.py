@@ -23,3 +23,17 @@ CALIBRATION_CHUNKS = CALIBRATION_DIR / "calibration_chunks.npz"
 CALIBRATION_MANIFEST = CALIBRATION_DIR / "calibration_manifest.csv"
 
 QUANTIZED_METRICS = Path("./models/quantized_metrics.json")
+
+# Held-out per-chunk predictions from the training run's CV folds. A DVC
+# output of train_model for the same reason the calibration set is one: it
+# can only be produced inside the fold loop, so once that run is over the
+# only way back to it is the recorded artifact.
+PREDICTIONS_DIR = Path("./data/predictions")
+OOF_PREDICTIONS = PREDICTIONS_DIR / "oof_predictions.csv"
+
+# Working directory for the Spotlight inspector (src/inspect_dataset.py):
+# one wav per chunk plus the table pointing at them. Derived, disposable and
+# rebuildable from the manifest, so it is git-ignored and *not* DVC-tracked.
+SPOTLIGHT_DIR = Path("./data/spotlight")
+SPOTLIGHT_TABLE = SPOTLIGHT_DIR / "inspection.parquet"
+SPOTLIGHT_AUDIO_DIR = SPOTLIGHT_DIR / "chunks"

@@ -62,7 +62,7 @@ A **feature representation and a model head are parameters, not branches** — y
 | 8 | `select_chunks` | Cut into chunks, balance bell vs. background, fix the row order | `data/chunk_manifest.csv` |
 | 9 | `extract_features` | Compute features **only** for the files the manifest references | `data/features/<variant>/` |
 | 10 | `draw_data` | Slice features onto the manifest rows | `data/balanced_data.h5` |
-| 11 | `train_model` | Cross-validate, then refit on 100% of the data | `models/trained/` |
+| 11 | `train_model` | Cross-validate, then refit on 100% of the data | `models/trained/`, `data/predictions/` |
 | 12 | `quantize_model` | int8 TFLite conversion + tracked calibration set | `models/export/`, `data/calibration/` |
 | 13 | `evaluate_quantized` | Compare float vs. int8, gate the result | `models/quantized_metrics.json` |
 
@@ -71,6 +71,7 @@ Two design points worth knowing before you change anything:
 - **`select_chunks` sits *before* `extract_features`.** It decides which chunks make up the dataset, so feature extraction only touches the ~1200 files actually used instead of all ~2800. It also takes no feature parameters, which means every feature variant trains on exactly the same chunks — that is what makes comparing them meaningful.
 - **`balanced_data.h5` is just the feature tensor.** One contiguous float32 array, row-aligned with `chunk_manifest.csv` — the metadata lives there, not duplicated in the HDF5. This also keeps the file byte-reproducible, so an unchanged pipeline genuinely skips retraining instead of rebuilding a model every run.
 - **`train_model` trains six models.** Five cross-validation folds produce the honest score (a mean with a standard deviation), and then a final model is refit on *all* the data — that last one is what ships. See [Reading the metrics](#reading-the-metrics).
+- **The folds' held-out predictions are kept**, per chunk, in `data/predictions/oof_predictions.csv` — every chunk scored by a model that never trained on it, joined to the Label Studio annotation and audio offset it came from. See [Inspecting the dataset](#inspecting-the-dataset).
 
 # Parameters
 
@@ -268,16 +269,18 @@ PYTHONPATH=./src:. uv run pytest tests/
 
 Measured on the same 1770 chunks, 5-fold cross-validated:
 
-| Variant | Head | val F1 | Worst fold | Peak activation |
-|---|---|---|---|---|
-| **log-mel 40×100** | cnn | **0.9931 ± 0.0095** | 0.9742 | 125 KB |
-| MFCC 40×100 | cnn | 0.9901 ± 0.0109 | 0.9702 | 125 KB |
-| YAMNet | xgboost | 0.9648 ± 0.0245 | 0.9350 | — |
-| STFT 129×250 | cnn | 0.8893 ± 0.1941 | **0.5017** | 1008 KB |
+| Variant | Head | val F1 | Worst fold | Held-out errors | int8 max deviation | Peak activation |
+|---|---|---|---|---|---|---|
+| **log-mel 40×100** | cnn | **0.9931 ± 0.0095** | 0.9742 | **16** / 1770 | **0.0868** | 125 KB |
+| MFCC 40×100 | cnn | 0.9901 ± 0.0109 | 0.9702 | 23 / 1770 | 0.2744 | 125 KB |
+| YAMNet | xgboost | 0.9648 ± 0.0245 | 0.9350 | 74 / 1770 | — | — |
+| STFT 129×250 | cnn | 0.8893 ± 0.1940 | **0.5017** | 170 / 1770 | 0.0788 | 1008 KB |
 
 Log-mel is the default because it wins on accuracy *and* fits the microcontroller.
 STFT ties the leaders on four folds out of five and then collapses to chance on the fifth — it is unstable, not merely worse, and it needs 8× the SRAM.
 YAMNet is a useful reference point but is a MobileNet producing 1024-dim embeddings, so it is not a microcontroller option at all.
+
+Two columns worth reading together. **Held-out errors** counts the chunks each variant got wrong out-of-fold (see [Inspecting the dataset](#inspecting-the-dataset)) — it separates variants that F1 rounds to near-identical, and it is a list of specific chunks you can go listen to rather than a summary statistic. **int8 max deviation** is how far quantization moves the raw sigmoid score against a 0.5 threshold: MFCC is perturbed **3× more** than log-mel (0.2744 vs 0.0868) for slightly worse accuracy, which is a second, independent reason to prefer log-mel on device. Every variant passes the quantization gate; the gate is about collapse, not about ranking.
 
 # Reading the metrics
 
@@ -290,6 +293,39 @@ Runs are tracked in MLflow (experiment `doorbell-detector`), named `<head>-<feat
 The shipped model is refit on 100% of the data, so it has no held-out data of its own. If you ever need a held-out number for those exact weights, carve out a fixed holdout before cross-validation — it cannot come from the quantization stage.
 
 When the quantization gate fails, the MLflow run is marked **FAILED** and carries `diagnostics/disagreements.csv` (every chunk where float and int8 predict differently, joined to its source recording) plus `diagnostics/worst_score_deviations.csv`. That is where you look to find out *why*.
+
+# Inspecting the dataset
+
+Metrics say *how often* the model is wrong. To find out *which* chunks it gets wrong — and whether they are hard samples or bad labels — there is an interactive viewer:
+
+```bash
+./src/inspect_dataset.sh                 # held-out predictions, audio, spectrograms
+./src/inspect_dataset.sh --embeddings    # + a similarity map of the CNN's embeddings
+./src/inspect_dataset.sh --all-chunks    # include chunks no fold held out
+```
+
+It opens [Renumics Spotlight](https://github.com/Renumics/spotlight) in a browser: one row per chunk, a filterable table, and an audio player plus spectrogram for whichever row you select. The table opens sorted with the errors first, most-confident-mistake at the top — a chunk the model was *sure* about and still got wrong is usually either genuinely hard or mislabeled.
+
+Every row carries where the chunk came from, so a suspicious one can be fixed at the source:
+
+| Column | What it is |
+|---|---|
+| `annotation_id` | the Label Studio annotation this chunk descends from (`aug_*` = synthetic, `noise_*` = external pool) |
+| `audio_file_name`, `chunk_start`, `chunk_end` | the recording and the exact window inside it, in milliseconds |
+| `start`, `end` | the annotated span in that recording, in seconds |
+| `label`, `true_class`, `predicted_class`, `outcome` | the label, and which confusion-matrix cell the chunk landed in |
+| `y_score`, `margin` | the raw probability, and its distance from the 0.5 threshold |
+| `fold`, `split_group` | which fold held this chunk out, and the recording that grouped it |
+| `snr_db`, `noise_pool` | for augmented and external-background rows |
+
+**The predictions are out-of-fold.** They come from `data/predictions/oof_predictions.csv`, written by `train_model` from inside the cross-validation loop, so every score belongs to a model that never saw that chunk. That matters: the shipped model is refit on 100% of the data, so its own mistakes are memorization failures rather than generalization ones. Nothing after `train_model` can reproduce this file — if it is missing, run `uv run dvc repro train_model` or `uv run dvc pull`.
+
+Two practical notes:
+
+- **Spotlight requires `librosa>=0.11` and `pyarrow>=21`**, which is why this project runs them. Changing a feature-extraction dependency under a cached dataset is a real corruption risk, so it was checked rather than assumed: log-mel, MFCC and STFT features come out **bit-identical** between librosa 0.10.2.post1 and 0.11.0 at these parameters. Nothing in `data/features/` was invalidated by the upgrade. Re-run that comparison before the next librosa bump.
+- **`data/spotlight/` is a disposable cache** (one wav per chunk, ~110 MB, plus the table). It is git-ignored, not DVC-tracked, and rebuilt on demand — delete it freely. Re-runs reuse the wavs unless you pass `--refresh`.
+
+With `training.n_eval_folds` capped to 1, only that fold's chunks have a held-out prediction; `oof_coverage` on the MLflow run says what fraction of the dataset that was, and `--all-chunks` shows the rest with their prediction columns marked `n/a`.
 
 # Repository Layout
 

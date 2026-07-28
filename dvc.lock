@@ -144,8 +144,8 @@ stages:
       size: 11506
     - path: src/paths.py
       hash: md5
-      md5: 9b20177b78279a43db30616583d66eed
-      size: 1032
+      md5: fc3a9cee0d8d5691274d5414c3c4f7a6
+      size: 1778
     params:
       params.yaml:
         feature_extraction:
@@ -194,22 +194,30 @@ stages:
       hash: md5
       md5: 8acb8eab1ae16c8b641e62f6001cec78
       size: 11506
+    - path: src/oof.py
+      hash: md5
+      md5: 2e9be25223b6d65a5f2d9d4c800d223a
+      size: 7108
     - path: src/paths.py
       hash: md5
-      md5: 9b20177b78279a43db30616583d66eed
-      size: 1032
+      md5: fc3a9cee0d8d5691274d5414c3c4f7a6
+      size: 1778
+    - path: src/provenance.py
+      hash: md5
+      md5: fb35b1ee0e47a7c53e47340ebbca069f
+      size: 2884
     - path: src/train_cnn.py
       hash: md5
-      md5: 4b5470465fb6e25d45d4b89cd6faf40a
-      size: 10292
+      md5: d4bb4670b13dae8556eece15afb1b963
+      size: 11463
     - path: src/train_model.py
       hash: md5
       md5: 7afe6fd0ee2852f8e4ac8f3118715f1c
       size: 1653
     - path: src/train_xgboost.py
       hash: md5
-      md5: 74a2025db38d1db947fe6277eb35be2c
-      size: 8741
+      md5: faa0cb70c88c812a0a3908a8f0db93b7
+      size: 9678
     params:
       params.yaml:
         model:
@@ -232,9 +240,14 @@ stages:
           n_eval_folds:
           head: cnn
     outs:
+    - path: data/predictions
+      hash: md5
+      md5: 37842e7c4fb797d845b6de0242e2e663.dir
+      size: 387667
+      nfiles: 1
     - path: models/trained
       hash: md5
-      md5: c78ab09b01972d5a56fe6e2803f5b51b.dir
+      md5: c440e38ed48d14cd3e201331fe21171e.dir
       size: 215459
       nfiles: 2
   draw_data:
@@ -263,8 +276,8 @@ stages:
       size: 11506
     - path: src/paths.py
       hash: md5
-      md5: 9b20177b78279a43db30616583d66eed
-      size: 1032
+      md5: fc3a9cee0d8d5691274d5414c3c4f7a6
+      size: 1778
     params:
       params.yaml:
         feature_extraction:
@@ -424,8 +437,8 @@ stages:
       size: 639
     - path: src/paths.py
       hash: md5
-      md5: 9b20177b78279a43db30616583d66eed
-      size: 1032
+      md5: fc3a9cee0d8d5691274d5414c3c4f7a6
+      size: 1778
     - path: src/select_chunks.py
       hash: md5
       md5: 9031b4de5fa00e76adc988adad64d8fa
@@ -519,7 +532,7 @@ stages:
       size: 261591
     - path: models/trained
       hash: md5
-      md5: c78ab09b01972d5a56fe6e2803f5b51b.dir
+      md5: c440e38ed48d14cd3e201331fe21171e.dir
       size: 215459
       nfiles: 2
     - path: src/dataset.py
@@ -528,8 +541,8 @@ stages:
       size: 3262
     - path: src/paths.py
       hash: md5
-      md5: 9b20177b78279a43db30616583d66eed
-      size: 1032
+      md5: fc3a9cee0d8d5691274d5414c3c4f7a6
+      size: 1778
     - path: src/quantize_model.py
       hash: md5
       md5: 775e74580972c1cc8ec87ebb89928a3f
@@ -540,8 +553,8 @@ stages:
       size: 4654
     - path: src/train_cnn.py
       hash: md5
-      md5: 4b5470465fb6e25d45d4b89cd6faf40a
-      size: 10292
+      md5: d4bb4670b13dae8556eece15afb1b963
+      size: 11463
     params:
       params.yaml:
         quantization.calibration_samples: 500
@@ -580,7 +593,7 @@ stages:
       nfiles: 3
     - path: models/trained
       hash: md5
-      md5: c78ab09b01972d5a56fe6e2803f5b51b.dir
+      md5: c440e38ed48d14cd3e201331fe21171e.dir
       size: 215459
       nfiles: 2
     - path: src/dataset.py
@@ -589,12 +602,16 @@ stages:
       size: 3262
     - path: src/evaluate_quantized.py
       hash: md5
-      md5: df7229327db59973126a99540db55589
-      size: 11911
+      md5: 63685f15a2ef98631ab44b2b420d6863
+      size: 11709
     - path: src/paths.py
       hash: md5
-      md5: 9b20177b78279a43db30616583d66eed
-      size: 1032
+      md5: fc3a9cee0d8d5691274d5414c3c4f7a6
+      size: 1778
+    - path: src/provenance.py
+      hash: md5
+      md5: fb35b1ee0e47a7c53e47340ebbca069f
+      size: 2884
     - path: src/quantize_model.py
       hash: md5
       md5: 775e74580972c1cc8ec87ebb89928a3f
@@ -605,12 +622,12 @@ stages:
       size: 4654
     - path: src/train_cnn.py
       hash: md5
-      md5: 4b5470465fb6e25d45d4b89cd6faf40a
-      size: 10292
+      md5: d4bb4670b13dae8556eece15afb1b963
+      size: 11463
     - path: src/train_xgboost.py
       hash: md5
-      md5: 74a2025db38d1db947fe6277eb35be2c
-      size: 8741
+      md5: faa0cb70c88c812a0a3908a8f0db93b7
+      size: 9678
     params:
       params.yaml:
         quantization:

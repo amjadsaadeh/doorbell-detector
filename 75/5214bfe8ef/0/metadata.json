@@ -1,0 +1,92 @@
+{
+  "cli_version": "0.9.0",
+  "checkpoint_id": "755214bfe8ef",
+  "session_id": "e28026c7-ce19-4225-8d34-97c923c2f4ce",
+  "strategy": "manual-commit",
+  "created_at": "2026-08-03T12:15:05.988030222Z",
+  "branch": "unified-pipeline",
+  "checkpoints_count": 3,
+  "save_step_count": 1,
+  "files_touched": [
+    "firmware/esp32-sense/.env.esp32.example",
+    "firmware/esp32-sense/.gitignore",
+    "firmware/esp32-sense/README.md",
+    "firmware/esp32-sense/build.sh",
+    "firmware/esp32-sense/include/audio_capture.h",
+    "firmware/esp32-sense/include/config.h",
+    "firmware/esp32-sense/include/mqtt_client.h",
+    "firmware/esp32-sense/include/ntp_time.h",
+    "firmware/esp32-sense/include/s3_uploader.h",
+    "firmware/esp32-sense/include/sd_storage.h",
+    "firmware/esp32-sense/include/upload_scheduler.h",
+    "firmware/esp32-sense/include/wav_writer.h",
+    "firmware/esp32-sense/include/wifi_manager.h",
+    "firmware/esp32-sense/lib/sigv4core/hmac_sha256.cpp",
+    "firmware/esp32-sense/lib/sigv4core/hmac_sha256.h",
+    "firmware/esp32-sense/lib/sigv4core/sha256.cpp",
+    "firmware/esp32-sense/lib/sigv4core/sha256.h",
+    "firmware/esp32-sense/lib/sigv4core/sigv4.cpp",
+    "firmware/esp32-sense/lib/sigv4core/sigv4.h",
+    "firmware/esp32-sense/platformio.ini",
+    "firmware/esp32-sense/src/audio_capture.cpp",
+    "firmware/esp32-sense/src/main.cpp",
+    "firmware/esp32-sense/src/mqtt_client.cpp",
+    "firmware/esp32-sense/src/ntp_time.cpp",
+    "firmware/esp32-sense/src/s3_uploader.cpp",
+    "firmware/esp32-sense/src/sd_storage.cpp",
+    "firmware/esp32-sense/src/upload_scheduler.cpp",
+    "firmware/esp32-sense/src/wav_writer.cpp",
+    "firmware/esp32-sense/src/wifi_manager.cpp",
+    "firmware/esp32-sense/test/test_sigv4/test_sigv4.cpp"
+  ],
+  "agent": "Claude Code",
+  "model": "claude-sonnet-5",
+  "turn_id": "1fe652fa5f36",
+  "compact_transcript_start": 0,
+  "token_usage": {
+    "input_tokens": 234,
+    "cache_creation_tokens": 244788,
+    "cache_read_tokens": 19524935,
+    "output_tokens": 102406,
+    "api_call_count": 117
+  },
+  "session_metrics": {
+    "turn_count": 3
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-08-03T12:15:05.835882459Z",
+    "agent_lines": 1626,
+    "agent_removed": 0,
+    "human_added": 0,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 1626,
+    "total_lines_changed": 1626,
+    "agent_percentage": 100,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 21,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        ".claude/scheduled_tasks.lock": 1,
+        ".claude/settings.local.json": 20
+      }
+    },
+    {
+      "checkpoint_number": 2,
+      "user_lines_added": 21,
+      "user_lines_removed": 0,
+      "agent_lines_added": 1626,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        ".claude/scheduled_tasks.lock": 1,
+        ".claude/settings.local.json": 20
+      }
+    }
+  ]
+}

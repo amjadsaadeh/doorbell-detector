@@ -1,0 +1,447 @@
+I want to ditch my raspberry pi zero w and use an esp32s3 sense. Checkout the detector script and port the recording behavior to the new platform. Limit the featureset for this step to the following behaviours:
+
+1. It should listen to the mqtt topic mentioned in the original script to trigger a recording, that is placed to an cd card.
+2. once a day (at about 3am) the recordings should be uploaded to the my minio bucket (url and credentials should be passed during build time)
+3. come up with a proper build environment which also runs on cli
+
+---
+
+<task-notification>
+<task-id>a286af8080263c44b</task-id>
+<tool-use-id>toolu_015pqkZgUmzsYv1pdHpMgDqD</tool-use-id>
+<output-file>/tmp/claude-1000/-home-orchid-projects-doorbell-detector/b176bc19-ae06-4cf4-a2ef-39cd5cdd7437/tasks/a286af8080263c44b.output</output-file>
+<status>completed</status>
+<summary>Agent "Explore detector.py and Pi deployment setup" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result># Report: `data_collection/detector.py` and related audio-recording infrastructure
+
+## 1. `data_collection/detector.py` — full analysis
+
+### MQTT connection details
+
+Setup function: `setup_mqtt_publisher()` at `data_collection/detector.py:349-413`.
+
+- **Client library**: `paho.mqtt.client` (imported conditionally, `MQTT_AVAILABLE` flag at lines 33-37)
+- **Broker host/port**: CLI args `--mqtt-host` (no default, disables MQTT if omitted) and `--mqtt-port` (default `1883`) — `detector.py:246-257`
+- **Auth**: username/password via `client.username_pw_set(args.mqtt_username, args.mqtt_password or None)` — `detector.py:368-370`. Both are plain CLI args (`--mqtt-username`, `--mqtt-password`, lines 264-275).
+- **TLS**: optional, via `--mqtt-tls` flag. Uses `client.tls_set(ca_certs=..., certfile=..., keyfile=..., tls_version=ssl.PROTOCOL_TLS)` (`detector.py:372-379`), with `--mqtt-tls-insecure` to disable cert verification. `ssl.PROTOCOL_TLS` is deprecated on Python 3.12+ (noted in CLAUDE.md line 235) but carried forward as-is.
+- **Detection publish topic**: `--mqtt-detect-topic`, default `"doorbell/detected"` (`detector.py:258-263`). Payload published on detection: `mqtt_client.publish(args.mqtt_detect_topic, datetime.datetime.now().isoformat())` (`detector.py:551`) — an ISO-8601 timestamp string, not a fixed sentinel value.
+- **Trigger subscribe topic** (the one relevant to your "record on MQTT trigger" port): `--mqtt-trigger-topic`, default `None` (disabled unless set) — `detector.py:304-309`. Subscription happens in `on_connect`:
+```python
+def on_connect(client, userdata, flags, rc):
+    if rc == 0:
+        log.info("MQTT connected to %s:%d", args.mqtt_host, args.mqtt_port)
+        if args.mqtt_trigger_topic:
+            client.subscribe(args.mqtt_trigger_topic)
+            log.info("MQTT subscribed to trigger topic '%s'", args.mqtt_trigger_topic)
+```
+(`detector.py:385-392`)
+
+- **Exact trigger payload match logic** — `on_message`, `detector.py:394-399`:
+```python
+def on_message(client, userdata, msg):
+    payload = msg.payload.decode(errors="replace").strip()
+    if args.mqtt_trigger_value is None or payload == args.mqtt_trigger_value:
+        log.info("MQTT trigger received on '%s': '%s'", msg.topic, payload)
+        if trigger_event is not None:
+            trigger_event.set()
+```
+If `--mqtt-trigger-value` is unset (default `None`), **any message on the trigger topic fires a recording** — no exact-match payload string required. If set, the payload string must equal `mqtt_trigger_value` exactly (after `.strip()`). There is no fixed default topic string for the trigger — it's purely operator-configured; in the deployed systemd env file (`doorbell-detector.env`) it is not even set (only detect-topic `doorbell/detected` is configured), meaning **the deployed instance does not currently use the MQTT trigger-to-record feature** — it only publishes detections. This is important: if you're porting "record on MQTT trigger," there's no canonical topic name in this repo to copy — you'll be defining a new one for the ESP32.
+
+### `--save` / recording behavior
+
+- `--save` (action="store_true", `detector.py:318-322`) turns on save mode.
+- `--save-dir` default `"recordings"` (`detector.py:323-328`).
+- On startup, if `--save`: `save_dir.mkdir(parents=True, exist_ok=True)` and the ring buffer is sized (`detector.py:453-461`):
+```python
+buffer_chunks = max(1, int(args.buffer_minutes * 60 / chunk_size_s))
+ring_buf: collections.deque = collections.deque(maxlen=buffer_chunks)
+```
+
+### Ring buffer algorithm (exact mechanics)
+
+Two separate `deque`s exist in the main loop:
+1. `ring_buf` — a `collections.deque(maxlen=buffer_chunks)` of raw PCM byte chunks, continuously `.append(data)`-ed every capture iteration (`detector.py:513-514`). This is the **pre-trigger** buffer — a fixed-size circular buffer; once full, appending evicts the oldest chunk automatically (deque's native behavior).
+2. `analysis_buf` — separate `deque(maxlen=analysis_chunks)` used only for cross-correlation scoring (not needed for your port).
+
+When a trigger fires (either the MQTT trigger_event or a cross-correlation detection), the flow is (`detector.py:517-543` for MQTT trigger path, `552-573` for detection path — logic is identical):
+```python
+pre_frames = list(ring_buf)                       # snapshot everything currently buffered
+post_chunks = max(1, int(args.post_trigger_seconds / chunk_size_s))
+post_frames = []
+for _ in range(post_chunks):
+    try:
+        post_frames.append(stream.read(chunk, exception_on_overflow=False))
+    except OSError:
+        log.warning("Buffer overflow during post-trigger collection")
+        break
+threading.Thread(target=save_clip, args=(pre_frames + post_frames, filepath), daemon=True).start()
+```
+Key facts:
+- **Pre-trigger frames**: whatever is currently in the ring buffer (up to `buffer_chunks` chunks) at the instant of trigger — this is "look-back" audio already captured before the event.
+- **Post-trigger frames**: captured synchronously in a blocking loop *after* the trigger, by calling `stream.read()` directly (not going through the deque) — this **blocks the main capture loop** while collecting post-trigger audio (a known repo caveat: "Cross-correlation is slow enough to drop audio in saved clips if not handled carefully", CLAUDE.md:238).
+- The concatenation `pre_frames + post_frames` is written to disk via `save_clip()`, called in a **daemon background thread** so file I/O doesn't block capture.
+- Chunk size = `chunk_size_s = args.chunk_size_ms / 1000.0` (default 500 ms → 0.5 s), `chunk = int(RATE * chunk_size_s)` samples per read (`detector.py:425-426`).
+
+### Clip duration
+
+Configurable, not fixed:
+- Pre-trigger: `--buffer-minutes`, default derived from `BUFFER_SECONDS` env var (default 3s) → `float(os.environ.get("BUFFER_SECONDS", 3)) / 60` minutes (`detector.py:329-334`). Deployed env: `BUFFER_SECONDS=3`.
+- Post-trigger: `--post-trigger-seconds`, default derived from `POST_TRIGGER_MINUTES` env var (default 0.1 min = 6s) → `float(os.environ.get("POST_TRIGGER_MINUTES", 0.1)) * 60` (`detector.py:335-340`). Deployed env: `POST_TRIGGER_MINUTES=0.1` (6s).
+- So the deployed default total clip is **~3s pre + ~6s post = ~9s**.
+
+### File naming convention
+
+Two distinct patterns depending on trigger source (both in `main()`):
+- Cross-correlation detection trigger: `ts = datetime.datetime.now().strftime("doorbell_%Y%m%d_%H%M%S.wav")` (`detector.py:553`)
+- MQTT manual trigger: `ts = datetime.datetime.now().strftime("doorbell_manual_%Y%m%d_%H%M%S.wav")` (`detector.py:520`)
+
+Both are joined with `save_dir`: `filepath = str(save_dir / ts)`.
+
+Example: `recordings/doorbell_manual_20260803_143022.wav`
+
+### WAV format
+
+`save_clip()` (`detector.py:180-198`):
+```python
+with wave.open(filepath, "wb") as wf:
+    wf.setnchannels(CHANNELS)
+    wf.setsampwidth(2)   # int16 = 2 bytes per sample
+    wf.setframerate(RATE)
+    wf.writeframes(b"".join(frames))
+```
+Constants (`detector.py:47-53`, explicitly commented as project-wide contract):
+```python
+CHANNELS = 1
+FORMAT = pyaudio.paInt16
+RATE = 16000
+```
+So: **16 kHz, mono, int16 PCM, standard WAV container** — confirmed as the project convention (also stated in README.md:19 "All audio is 16 kHz, mono, int16").
+
+### Config relevant vs. irrelevant for an "MQTT-trigger-only, no cross-correlation" port
+
+**Irrelevant** (pure cross-correlation detection logic, skip entirely):
+- `load_template()`, `select_template_window()`, `compute_score()` (lines 67-177)
+- `--template`, `--threshold`, `--analysis-window-seconds`, `--cooldown-seconds`
+- `analysis_buf` deque and all scoring logic
+- `--mqtt-detect-topic` (this is the *publish* topic for detections, not needed if the ESP32 doesn't do its own detection)
+- `resample_poly`/`gcd` template resampling
+
+**Relevant** (needed for MQTT-trigger → ring-buffer → WAV-save):
+- `--device-name` (find_device concept doesn't map to ESP32 directly — you'll have an I2S mic instead — but the same input-source discovery *idea* isn't needed on embedded; irrelevant in practice for ESP32)
+- `--chunk-size-ms` → chunk/buffer sizing math
+- `--mqtt-host`, `--mqtt-port`, `--mqtt-username`, `--mqtt-password`, `--mqtt-tls*` (auth/connection)
+- `--mqtt-trigger-topic`, `--mqtt-trigger-value` (the actual mechanism you're porting)
+- `--save`, `--save-dir`, `--buffer-minutes` / `BUFFER_SECONDS`, `--post-trigger-seconds` / `POST_TRIGGER_MINUTES`
+- `CHANNELS`, `FORMAT` (paInt16 concept → 16-bit signed samples), `RATE` (16000) — the WAV format contract
+- `ring_buf` deque eviction algorithm, `save_clip()` WAV-writing structure, file-naming timestamp pattern
+- Background/async write pattern (daemon thread — on ESP32 you'd use a task/queue instead)
+
+### CLI args and password handling (relevant to CLAUDE.md limitation)
+
+All args parsed via `argparse` in `parse_args()` (`detector.py:201-342`). Per CLAUDE.md:234: **"MQTT password is passed as a CLI arg (visible in `/proc/&lt;pid&gt;/cmdline`) — known limitation, not a bug to fix here."** This matches what's in the systemd `ExecStart=` (ExecStart passes `--mqtt-password ${MQTT_PASSWORD}` directly as a shell-expanded CLI argument, `doorbell-detector.service:37`) — confirming the password does flow through argv, not just env. On an ESP32 there is no `/proc` equivalent/multi-user OS, so this specific limitation is largely moot for the port (though you'll still want to avoid hardcoding secrets in firmware source — consider NVS or a config partition instead).
+
+---
+
+## 2. systemd service + env file
+
+`data_collection/systemd/doorbell-detector.service` (full contents shown above) — key points:
+- `WorkingDirectory=/home/pi/doorbell-detector/data_collection`
+- `EnvironmentFile=/etc/doorbell-detector.env`
+- `ExecStart` builds the exact CLI invocation from env vars: `TEMPLATE`, `DEVICE_NAME`, `CHUNK_SIZE_MS`, `MQTT_HOST`, `MQTT_PORT`, `MQTT_DETECT_TOPIC`, `MQTT_USERNAME`, `MQTT_PASSWORD`, `TEMPLATE_SCORE_THRESHOLD` — note **the trigger-topic/trigger-value and save-related flags are NOT included in `ExecStart`**, meaning the deployed service does not currently pass `--save`, `--mqtt-trigger-topic`, or buffer settings even though the env file defines `BUFFER_SECONDS`/`POST_TRIGGER_MINUTES` (dead config in the current deployment — only relevant if `--save` were added to ExecStart manually).
+- `Restart=always`, `RestartSec=5`, `Nice=10`, `OOMScoreAdjust=-100` — Pi-Zero-friendly resource tuning, irrelevant to ESP32 firmware.
+
+`data_collection/systemd/doorbell-detector.env` env vars:
+- `TEMPLATE` (cross-correlation only, irrelevant to your port)
+- `REDACTED` (Pi audio HAT specific; ESP32 will use I2S mic directly)
+- `CHUNK_SIZE_MS=500`
+- `BUFFER_SECONDS=3`, `POST_TRIGGER_MINUTES=0.1` — **directly relevant**, these are the ring-buffer sizing knobs
+- `MQTT_HOST`, `MQTT_PORT=1883`, `MQTT_DETECT_TOPIC=doorbell/detected`, `MQTT_USERNAME`/`MQTT_PASSWORD` (commented out), `MQTT_TLS_CA/CERTFILE/KEYFILE` (commented)
+- `TEMPLATE_SCORE_THRESHOLD=0.4` (cross-correlation only, irrelevant)
+
+---
+
+## 3. `data_collection/requirements.txt`
+
+```
+numpy==1.26.4
+scipy&gt;=1.2.0
+soundfile&gt;=0.12.1
+paho-mqtt==2.1.0
+PyAudio==0.2.14
+PyYAML==6.0.2
+xgboost==2.1.3
+# RPi.GPIO==0.7.1  # uncomment on Raspberry Pi
+```
+Mapping to ESP32-S3 equivalents:
+- `paho-mqtt` → an embedded MQTT client (e.g. ESP-IDF's `esp-mqtt`/`esp_mqtt_client`, or Arduino `PubSubClient`/`espressif's arduino-mqtt`)
+- `PyAudio` (audio capture from device) → I2S driver reading directly from the ESP32-S3's onboard/attached PDM/I2S mic (the Sense board typically pairs with an OV camera + mic; you'd use `driver/i2s.h` or `esp_codec_dev`)
+- `soundfile`/`wave` (WAV writing) → you'll hand-roll a 44-byte WAV header + raw PCM writer to SD (SdFat/FATFS), since there's no `soundfile`-equivalent library needed — WAV format is trivial to construct manually
+- `numpy`, `scipy`, `xgboost` — irrelevant to the "record on trigger" feature (only needed for cross-correlation/ML inference, which you're explicitly not porting)
+
+---
+
+## 4. Existing S3/MinIO upload code — search results
+
+**No upload code exists anywhere in the repo.** Search of `src/` and `data_collection/` for `boto3|minio|s3|upload` found only **download** code:
+- `src/download_audio.py` — downloads from S3/MinIO via `boto3.client("s3", endpoint_url=os.getenv("AWS_ENDPOINT_URL"))` (`src/download_audio.py:59`), credentials come from the default boto3 chain (env vars).
+- `src/convert_labeled_data.py` — S3 URI parsing/normalization utilities (no transfer logic).
+- `src/provenance.py:35` — just a comment mentioning `s3://` traceability.
+- `src/audio_sources.py:7` — comment noting a naming convention distinguishes uploaded recordings from augmented ones (naming only, no upload mechanism).
+
+**Credential env var names** (from CLAUDE.md:94-97, and confirmed by `download_audio.py` usage), stored in a git-ignored `.env`:
+```
+AWS_ENDPOINT_URL       # MinIO endpoint (self-hosted, S3-compatible)
+AWS_ACCESS_KEY_ID
+AWS_SECRET_ACCESS_KEY
+```
+(Plus unrelated `LABEL_STUDIO_URL`, `LABEL_STUDIO_API_KEY`, `MLFLOW_TRACKING_URI`, `MLFLOW_TRACKING_USERNAME`, `MLFLOW_TRACKING_PASSWORD` — not relevant to S3.)
+
+For your ESP32 HTTP-based S3 upload (e.g. presigned PUT or raw S3 REST API with SigV4/AWS4-HMAC), the naming convention to reuse for consistency would be:
+- `AWS_ENDPOINT_URL` (or a firmware-specific `MINIO_URL`/`S3_ENDPOINT`) for the MinIO base URL
+- `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` for credentials
+
+There is no existing upload URI/naming scheme for *written* objects to mirror (i.e., no convention showing what key/path format audio clips get uploaded to) — only the canonical `s3://bucket/key` read-side URI format used for `remote_audio_path` in `convert_labeled_data.py`/`download_audio.py`. You'll be establishing the upload-key naming convention fresh, but I'd suggest reusing the WAV filename patterns from `detector.py` (`doorbell_%Y%m%d_%H%M%S.wav` / `doorbell_manual_%Y%m%d_%H%M%S.wav`) as the S3 object key for consistency with existing recordings already in the dataset.
+
+---
+
+## 5. `data_collector.py` vs. `detector.py` — which is the better MQTT-trigger-plus-ring-buffer reference
+
+**`data_collector.py` is the better reference for this specific feature.** Its save/trigger path is simpler, cleaner, and *not* commingled with cross-correlation timing constraints:
+
+- Single unified `audio_buffer` deque used both as the live ring buffer AND the pre-trigger snapshot source (no separate scoring-buffer complexity) — `data_collector.py:301-303, 374`.
+- `save_audio()` (`data_collector.py:64-80`) is a clean, synchronous helper combining ring-buffer snapshot + blocking post-trigger reads + WAV write, called directly (not backgrounded in a thread) with an `is_saving` guard flag to prevent overlapping saves (`data_collector.py:379, 385, 404, 411`) — this is arguably a **simpler and more robust mental model** for the ESP32 port than `detector.py`'s fire-and-forget daemon-thread approach, since embedded environments benefit from explicit state flags over Python threading.
+- Filename pattern: `f"recording_{ts}.wav"` with `ts = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")` (`data_collector.py:380-381, 405-406`) — simpler/more generic than detector.py's `doorbell_`-prefixed names, good default if you don't want detection-specific naming.
+- MQTT setup (`setup_mqtt()`, `data_collector.py:87-137`) is functionally **identical** to `detector.py`'s (same connect/tls/on_message/trigger_event.set() pattern) — topic is `--mqtt-topic` default `"doorbell/trigger"` (`data_collector.py:230-233`), with the same `--mqtt-trigger-value` exact-match-or-any-message semantics (`data_collector.py:121-125`).
+- It additionally demonstrates a GPIO physical-button trigger sharing the same `trigger_event` (`data_collector.py:140-154`) — a useful pattern if the ESP32-S3 project ever wants a manual button alongside MQTT.
+- It reopens the audio stream on `OSError` (buffer overflow) rather than just logging and continuing (`data_collector.py:413-421`) — more resilient error handling to mirror in firmware.
+
+`detector.py`'s ring-buffer/save code is functionally similar but structurally entangled with the cross-correlation `analysis_buf` and threaded background writes, plus two divergent trigger-vs-detection code paths that duplicate the save logic (lines 517-543 and 552-573 are near-identical copy-pasted blocks) — a maintenance smell you don't need to replicate.
+
+**Recommendation**: model the ESP32 port's ring-buffer + MQTT-trigger + WAV-save logic on `data_collector.py`'s `save_audio()` + `setup_mqtt()` + `is_saving` guard pattern, using `detector.py` only for the exact WAV constants (`CHANNELS=1`, `paInt16`→16-bit signed, `RATE=16000`) and its two-tier `on_connect`/`on_message` MQTT plumbing (both scripts implement this pattern identically, so either works as the MQTT reference).
+
+---
+
+## 6. Existing ESP32/embedded/PlatformIO/Arduino code
+
+**None exists in the repo.** Searched for `*.ino`, `platformio.ini`, and case-insensitive `esp32`/`arduino` across the whole tree (excluding `.venv`, `.git`, `.dvc/cache`) — zero firmware/embedded source files found. The only ESP32 references are **documentation/planning mentions** of it as the eventual inference target for the trained ML model (not audio recording):
+- `README.md:21` — "The trained model targets an ESP32-S3 as its eventual inference host... int8 TFLite export"
+- `README.md:344, 346` — "sized for an ESP32-S3", and a to-do idea listing "firmware for the ESP32-S3"
+- `CLAUDE.md:9-10, 29` — pipeline exports int8 TFLite "sized for an ESP32-S3"; historic dvc branch name `esp32-logmel`
+- `params.yaml:65-68, 117-119` — feature geometry (40 mel bands, SRAM budget) chosen to fit ESP32-S3 constraints
+- `src/quantize_model.py:1` — docstring: "Quantize the trained CNN to full-integer int8 for the ESP32-S3."
+
+So you'll be starting the ESP32-S3 audio-recording firmware **from scratch** — there's no existing PlatformIO project, Arduino sketch, or ESP-IDF scaffold to build on top of in this repo.</result>
+<usage><subagent_tokens>52999</subagent_tokens><tool_uses>9</tool_uses><duration_ms>117410</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>ac3179c18ebd9afc6</task-id>
+<tool-use-id>toolu_01EP9d4tWXHTYhR9W1zQGRHC</tool-use-id>
+<output-file>/tmp/claude-1000/-home-orchid-projects-doorbell-detector/b176bc19-ae06-4cf4-a2ef-39cd5cdd7437/tasks/ac3179c18ebd9afc6.output</output-file>
+<status>completed</status>
+<summary>Agent "Design ESP32-S3 doorbell firmware plan" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result># ESP32S3 Doorbell Recorder — Implementation Blueprint
+
+Confirmed from the repo before drafting this: `.env` already has `AWS_ENDPOINT_URL=http://192.168.178.126:9000` (plain HTTP, no TLS) and MinIO bucket `doorbell-detector` already uses `raw/`, `annotations/`, `dvc/` prefixes (`CLAUDE.md:91-93`). The `esp32-recordings/&lt;device_id&gt;/` prefix is a clean, non-colliding addition. The Pi's `detector.py` MQTT-trigger path already produces filenames via `doorbell_manual_%Y%m%d_%H%M%S.wav` (`data_collection/detector.py:520`) — reuse verbatim. Also worth noting for later: `README.md` already earmarks the ESP32-S3 as the eventual *ML inference* host with a 26KB int8 TFLite model — this firmware is deliberately the recorder-only precursor to that, not a replacement for it.
+
+## 1. Directory Layout
+
+```
+firmware/esp32-sense/
+├── platformio.ini
+├── build.sh                     # wrapper: sources .env.esp32, execs `pio "$@"`
+├── .env.esp32.example           # checked in, placeholder values
+├── .env.esp32                   # git-ignored, real secrets
+├── .gitignore                   # .env.esp32, .pio/
+├── include/
+│   └── config.h                 # compile-time constants (sample rate, buffer sizes, pins)
+└── src/
+    ├── main.cpp                 # setup()/loop() glue, task spawn
+    ├── audio_capture.h/.cpp     # I2S PDM init, ring buffer, trigger→save sequence (runs in loop())
+    ├── wav_writer.h/.cpp        # 44-byte canonical WAV header builder
+    ├── sd_storage.h/.cpp        # SD.begin(21), filename gen, list/delete recordings, SD mutex
+    ├── wifi_manager.h/.cpp      # WiFi.begin + reconnect
+    ├── mqtt_client.h/.cpp       # PubSubClient wrapper, subscribe, trigger handoff
+    ├── ntp_time.h/.cpp          # configTzTime, periodic resync, isSynced()
+    ├── upload_scheduler.h/.cpp  # once-a-day 3am check + boot catch-up
+    ├── s3_uploader.h/.cpp       # HTTPClient PUT, streams File as Stream*
+    └── sigv4.h/.cpp             # canonical request / signing key / Authorization header (pure, no networking)
+```
+
+Rationale for `sigv4.h/.cpp` being separate from `s3_uploader.h/.cpp`: SigV4 math is the single highest-risk piece of hand-rolled logic in this project (easy to get subtly wrong and hard to debug against a real server). Isolating it as pure functions (`bytes/headers in → Authorization string out`) means it can be unit-tested with a native PlatformIO test environment (`pio test -e native`) against known AWS SigV4 test vectors, without needing hardware or a live MinIO instance.
+
+## 2. Module Responsibilities &amp; Data Flow
+
+```
+                         ┌─────────────────────────────┐
+MQTT broker  ──msg──►    │ mqtt_client (net task/core0)│──xTaskNotifyGive──► loopTask (core1)
+(doorbell/trigger)       └─────────────────────────────┘                         │
+                                                                                   ▼
+                                                                    audio_capture::loop()
+                                                                    ┌──────────────────────┐
+PDM mic ──I2S.read()──►  ring buffer (PSRAM, 3s)                    │ if notified &amp; !busy:  │
+                          continuously overwritten           ◄──────│  snapshot ring buf    │
+                                                                     │  + capture 6s more    │
+                                                                     │  write WAV via SD     │
+                                                                     │  mutex               │
+                                                                     └──────────────────────┘
+                                                                                   │
+                                                                                   ▼
+                                                            SD card: /recordings/*.wav.tmp → rename → *.wav
+                                                                                   │
+                                                                     (directory IS the queue —
+                                                                      no signal needed to net task)
+                                                                                   │
+                              ┌────────────────────────────────────────────────────┘
+                              ▼
+                    upload_scheduler (net task/core0, polled every ~10 min)
+                    if NTP-synced &amp;&amp; local hour==3 &amp;&amp; !uploadedToday:
+                        for each *.wav under /recordings/: sigv4-sign → s3_uploader PUT
+                        delete on 2xx, leave for retry on failure
+```
+
+Key architectural point directly answering your question: **the SD directory itself is the handoff between recording and upload — no "file ready" signal needed.** Confirmed: scan-once-a-day is sufficient. The *only* place true synchronization is required between the two tasks is the SD/SPI peripheral itself (see §3).
+
+| Module | Owns | Talks to |
+|---|---|---|
+| `audio_capture` | I2S init, ring buffer, trigger→snapshot→post-capture→save sequence | `wav_writer`, `sd_storage` (mutex), consumes MQTT notification |
+| `wav_writer` | Pure WAV header math | called by `audio_capture` |
+| `sd_storage` | `SD.begin()`, path/filename helpers, directory listing, SD mutex ownership | used by `audio_capture` and `upload_scheduler` |
+| `wifi_manager` | WiFi connect/reconnect | used by `main`, `ntp_time`, `mqtt_client` |
+| `mqtt_client` | PubSubClient connect/subscribe/loop, reconnect backoff | notifies `audio_capture`'s task handle |
+| `ntp_time` | `configTzTime`, periodic resync, `isSynced()` | used by `sd_storage` (filenames), `upload_scheduler` |
+| `upload_scheduler` | Daily 3am gate + boot catch-up | calls `sd_storage` (list/delete), `s3_uploader` |
+| `s3_uploader` | HTTP PUT via `HTTPClient`, streams `File` | calls `sigv4` |
+| `sigv4` | Canonical request, signing key, Authorization header | pure, no I/O |
+
+## 3. Concurrency Model
+
+**Simplification over a naive 2-explicit-tasks design:** the Arduino core already runs `loop()` as its own FreeRTOS task (`loopTask`, pinned to core 1 by default on ESP32). Leverage that instead of spawning a redundant audio task — put the PDM read / ring-buffer / trigger-handling sequence directly in `loop()`. Spawn exactly **one** additional task, `networkTask`, pinned to core 0, running WiFi/MQTT service + the upload scheduler poll. This is fewer moving parts for the same effective two-core split.
+
+- **Trigger handoff** (net task → audio/loop task): `mqtt_client`'s `on_message` callback (runs inside `mqttClient.loop()` on core 0) calls `xTaskNotifyGive(loopTaskHandle)`. `loop()` polls non-blockingly each iteration with `ulTaskNotifyTake(pdTRUE, 0)`. This is the FreeRTOS-native, zero-extra-object way to move a single boolean event across cores — no custom queue/semaphore struct needed.
+- **`is_saving` guard** (ported from Pi): a `volatile bool isRecording` checked in `loop()` before consuming a notification. A second trigger arriving mid-recording is simply left un-consumed (task notifications coalesce a pending "1" rather than queuing multiple) — this reproduces the Pi's "ignore concurrent triggers" behavior with less code than a semaphore, matching your "pick the simpler one" call.
+- **Ring buffer**: owned exclusively by the loop-task/core-1 — no lock needed since nothing else ever touches it.
+- **SD card — the one real gap in your draft spec to flag:** SD/SPI is touched by *both* tasks (audio task writes the WAV; network task lists/deletes during upload). The Arduino `SD`/`SPI` stack is not safe for concurrent access from two cores. **This needs a mutex** (`SemaphoreHandle_t sdMutex`, created in `sd_storage::begin()`), taken by both the WAV-write step and every upload-scan/delete step. This wasn't explicit in your draft ("communicating via a queue/flag/semaphore for trigger/file-ready") — the trigger handoff needs a notification, but the SD card needs a true mutex because it's genuinely shared mutable state accessed from two cores, not just a producer/consumer signal.
+
+## 4. Key Algorithms
+
+**Ring buffer:** `heap_caps_malloc(BUFFER_SECONDS * 16000 * 2, MALLOC_CAP_SPIRAM)` (96 KB for 3s). Circular byte array with `writePos`; each PDM read chunk copied in with wraparound (two `memcpy`s if the chunk straddles the end). Always "live" from boot — first 3s of pre-roll before the buffer fully wraps will just be silence/zeros, which is an acceptable, unavoidable cold-start edge case.
+
+**Trigger → save sequence** (mirrors Pi's blocking-append model, in `loop()`):
+1. Notification observed, `!isRecording` → `isRecording = true`.
+2. Allocate/reuse a PSRAM clip buffer sized `(BUFFER_SECONDS + POST_TRIGGER_SECONDS + margin) * 32000` bytes (~320 KB for 3s+6s+1s margin).
+3. Copy ring buffer into the clip buffer in chronological order (oldest-to-newest, 1–2 `memcpy`s depending on wrap position).
+4. Continue reading PDM chunks, appending directly to the clip buffer (not to the ring buffer — matches Pi's behavior of the ring buffer being paused during a save), until total length reaches the target.
+5. Generate filename via NTP-synced localtime: `doorbell_manual_%Y%m%d_%H%M%S.wav`. **Edge case to flag:** if NTP hasn't synced yet (e.g., trigger fires seconds after boot before WiFi/NTP settle), fall back to a `millis()`-based sequential name so the file isn't silently dropped.
+6. Write to a temp name (`/recordings/.tmp/&lt;name&gt;.wav` or `&lt;name&gt;.wav.tmp`) under the SD mutex, then rename to the final `.wav` name only after a successful close. **This atomic-rename step is a recommended addition**, not in your draft: without it, a crash/reset mid-write leaves a truncated file with a garbage RIFF size that the upload scanner (which just globs `*.wav`) would happily try to upload.
+7. `isRecording = false`.
+
+**WAV header** (`wav_writer`): standard 44-byte canonical header — `RIFF/WAVE/fmt /data`, PCM format 1, 1 channel, 16000 Hz, 16-bit, block align 2, byte rate 32000. No library needed; hand-write the struct.
+
+**SigV4 signer** (single PUT, no multipart, no query string):
+- Canonical request → string-to-sign → `HMAC` chain (`AWS4"+secret → date → region → "s3" → "aws4_request"`) → hex signature → `Authorization` header, all via `mbedtls_sha256`/`mbedtls_md_hmac` (bundled with the ESP32 Arduino core — no extra lib_dep).
+- **Recommended simplification over your draft:** use `x-amz-content-sha256: UNSIGNED-PAYLOAD` instead of hashing the actual file body. Hashing the real payload would require reading the ~288 KB clip from SD twice (once to hash, once to stream) for negligible security benefit on a private LAN. MinIO accepts `UNSIGNED-PAYLOAD`. This halves SD I/O per upload and removes a class of bugs.
+- Body streaming: `HTTPClient::sendRequest("PUT", &amp;sdFile, fileSize)` accepts a `Stream*` directly — `File` extends `Stream`, so this satisfies the "streamed from SD, not loaded fully into RAM" requirement with zero custom chunking code.
+- Region: MinIO doesn't enforce it meaningfully; hardcode `us-east-1` as a build flag default.
+
+**Daily upload scheduler:** poll every ~10 min from `networkTask`:
+```
+if (!ntp_time::isSynced()) return;
+tm = ntp_time::localNow();
+if (tm.tm_hour == 3 &amp;&amp; !uploadedToday) { runUpload(); uploadedToday = true; }
+if (tm.tm_hour != 3) uploadedToday = false;   // re-arm once we leave the 3 o'clock hour
+```
+**Recommended addition** (not in your draft): also run `runUpload()` once immediately after every successful boot + WiFi + NTP sync, in addition to the 3am trigger. Rationale: with the pure-RAM `uploadedToday` flag, a reboot at 3:05am (power blip) means that day's recordings wait a full 24h before the next attempt. A cheap boot-time catch-up closes that gap at near-zero cost, since the upload routine already tolerates being called redundantly (nothing left to upload = no-op).
+
+## 5. platformio.ini Sketch
+
+```ini
+[env:seeed_xiao_esp32s3]
+platform = espressif32@6.9.0        ; pin explicitly — PDM-RX I2S support on S3 has moved across core versions
+board = seeed_xiao_esp32s3
+framework = arduino
+board_build.arduino.memory_type = qio_opi   ; enable OPI PSRAM
+monitor_speed = 115200
+
+build_flags =
+  -DBOARD_HAS_PSRAM
+  '-DWIFI_SSID="${sysenv.ESP32_WIFI_SSID}"'
+  '-DWIFI_PASSWORD="${sysenv.ESP32_WIFI_PASSWORD}"'
+  '-DMQTT_HOST="${sysenv.ESP32_MQTT_HOST}"'
+  -DMQTT_PORT=${sysenv.ESP32_MQTT_PORT}
+  '-DMQTT_USERNAME="${sysenv.ESP32_MQTT_USERNAME}"'
+  '-DMQTT_PASSWORD="${sysenv.ESP32_MQTT_PASSWORD}"'
+  '-DMINIO_ENDPOINT="${sysenv.ESP32_MINIO_ENDPOINT}"'
+  '-DMINIO_ACCESS_KEY="${sysenv.ESP32_MINIO_ACCESS_KEY}"'
+  '-DMINIO_SECRET_KEY="${sysenv.ESP32_MINIO_SECRET_KEY}"'
+  '-DMINIO_BUCKET="${sysenv.ESP32_MINIO_BUCKET}"'
+  '-DMINIO_REGION="${sysenv.ESP32_MINIO_REGION}"'
+  '-DDEVICE_ID="${sysenv.ESP32_DEVICE_ID}"'
+  '-DTZ_STRING="${sysenv.ESP32_TZ}"'
+
+lib_deps =
+  knolleary/PubSubClient@^2.8
+```
+`platformio.ini` itself is checked in (no literal secrets, only `${sysenv.*}` interpolation) — mirrors the repo's existing pattern where credentials live only in `.env`.
+
+## 6. Secrets / Build Script Design
+
+`firmware/esp32-sense/.env.esp32` (git-ignored):
+```
+ESP32_WIFI_SSID=...
+ESP32_WIFI_PASSWORD=...
+ESP32_MQTT_HOST=192.168.178.108
+ESP32_MQTT_PORT=1883
+ESP32_MQTT_USERNAME=
+ESP32_MQTT_PASSWORD=
+ESP32_MINIO_ENDPOINT=192.168.178.126:9000
+ESP32_MINIO_ACCESS_KEY=doorbell-detector
+ESP32_MINIO_SECRET_KEY=...
+REDACTED
+ESP32_MINIO_REGION=us-east-1
+ESP32_DEVICE_ID=xiao-sense-01
+ESP32_TZ=CET-1CEST,M3.5.0,M10.5.0/3   # adjust for actual locale; UTC if unset
+```
+`firmware/esp32-sense/build.sh`:
+```bash
+#!/usr/bin/env bash
+set -euo pipefail
+cd "$(dirname "$0")"
+[ -f .env.esp32 ] &amp;&amp; { set -a; source .env.esp32; set +a; }
+pio "$@"    # ./build.sh run -t upload ; ./build.sh device monitor
+```
+Add `firmware/esp32-sense/.env.esp32` and `firmware/esp32-sense/.pio/` to a `.gitignore` (either repo-root's existing one or a scoped one in the firmware dir). Ship `.env.esp32.example` with placeholder values, checked in, for onboarding — the root repo doesn't currently have this pattern for its Python `.env`, but it's a low-cost improvement worth introducing here.
+
+## 7. Confirmed / Called-Out Design Decisions
+
+- **I2S API:** use the newer explicit-mode API (`I2S.setPinsPdmRx(42,41)` + `I2S_MODE_PDM_RX`/`I2S_SLOT_MODE_MONO`) rather than the legacy `setAllPins`/`PDM_MONO_MODE` call — it's the actively maintained path in current arduino-esp32 cores. This is *why* the platform version needs to be pinned explicitly rather than left floating.
+- **No TLS for MQTT or MinIO:** confirmed correct given the repo's own `.env` already points at MinIO over plain HTTP, and the existing project's MQTT design doc also assumes plain broker access on the LAN. Removes `WiFiClientSecure`/cert-bundling complexity entirely for v1.
+- **Once-daily directory scan is sufficient:** confirmed, with the boot-time catch-up added as a low-cost safety net (§4).
+- **Single-PUT, no multipart:** confirmed, clips are ~288 KB.
+
+## 8. Flagged Issues / Missing Edge Cases (beyond what's already threaded above)
+
+1. **SD mutex is a hard requirement, not optional** — the one place this design needs true cross-core synchronization, not just a flag (§3).
+2. **Atomic rename for WAV files** — write to `.tmp`, rename on success, so a crash mid-write can never produce a half-written file that the upload scanner picks up.
+3. **PSRAM allocation must be checked, not assumed** — `heap_caps_malloc` silently returns `nullptr` if `board_build.arduino.memory_type` is misconfigured; this is the most build-config-fragile part of the whole project and deserves an explicit check + halt-and-blink/serial-log rather than a null-pointer crash.
+4. **DST edge case around the 3am window** — once/year the "hour == 3" check can double-fire or get skipped during a DST transition; low risk given the retry-tolerant design, not worth extra engineering, just worth a one-line note in the plan so it's not mistaken for a bug later.
+5. **Flash-level secret exposure** — baking WiFi/MinIO credentials as literal `#define` strings means anyone with physical flash access can `strings` them out. Fine for v1 on a private home LAN (matches your explicit build-time-injection preference), but call out flash encryption as a future hardening step, explicitly out of scope now.
+6. **Unbounded SD growth on repeated upload failure** — no monitoring was requested, but note it as a known limitation; a cheap addition (not mandatory) would be logging free SD space once a day.
+7. **Bring-up order recommendation:** validate PDM mic capture → SD write in isolation first (record N seconds, no networking at all) as the first milestone, before adding WiFi/MQTT/SigV4. This is the highest-risk hardware integration point (I2S-PDM support on S3 across core versions) and should be de-risked before layering the network stack on top.
+
+### Critical Files for Implementation
+- `/home/orchid/projects/doorbell-detector/data_collection/detector.py` (lines ~245-411, 520-551: MQTT trigger pattern, filename convention, ring-buffer save sequence to port)
+- `/home/orchid/projects/doorbell-detector/data_collection/data_collector.py` (ring buffer + `is_saving` guard reference implementation)
+- `/home/orchid/projects/doorbell-detector/.env` (confirms MinIO endpoint is plain HTTP, existing bucket/credential naming convention)
+- `/home/orchid/projects/doorbell-detector/CLAUDE.md` (lines ~91-96: bucket layout `doorbell-detector`/`raw/`/`annotations/`/`dvc/`, credential list)
+- `firmware/esp32-sense/platformio.ini` (new file — the actual build/config contract this whole plan hinges on)</result>
+<usage><subagent_tokens>42781</subagent_tokens><tool_uses>13</tool_uses><duration_ms>281844</duration_ms></usage>
+</task-notification>
+
+---
+
+continue

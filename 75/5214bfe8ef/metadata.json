@@ -1,0 +1,55 @@
+{
+  "cli_version": "0.9.0",
+  "checkpoint_id": "755214bfe8ef",
+  "strategy": "manual-commit",
+  "branch": "unified-pipeline",
+  "checkpoints_count": 3,
+  "files_touched": [
+    "firmware/esp32-sense/.env.esp32.example",
+    "firmware/esp32-sense/.gitignore",
+    "firmware/esp32-sense/README.md",
+    "firmware/esp32-sense/build.sh",
+    "firmware/esp32-sense/include/audio_capture.h",
+    "firmware/esp32-sense/include/config.h",
+    "firmware/esp32-sense/include/mqtt_client.h",
+    "firmware/esp32-sense/include/ntp_time.h",
+    "firmware/esp32-sense/include/s3_uploader.h",
+    "firmware/esp32-sense/include/sd_storage.h",
+    "firmware/esp32-sense/include/upload_scheduler.h",
+    "firmware/esp32-sense/include/wav_writer.h",
+    "firmware/esp32-sense/include/wifi_manager.h",
+    "firmware/esp32-sense/lib/sigv4core/hmac_sha256.cpp",
+    "firmware/esp32-sense/lib/sigv4core/hmac_sha256.h",
+    "firmware/esp32-sense/lib/sigv4core/sha256.cpp",
+    "firmware/esp32-sense/lib/sigv4core/sha256.h",
+    "firmware/esp32-sense/lib/sigv4core/sigv4.cpp",
+    "firmware/esp32-sense/lib/sigv4core/sigv4.h",
+    "firmware/esp32-sense/platformio.ini",
+    "firmware/esp32-sense/src/audio_capture.cpp",
+    "firmware/esp32-sense/src/main.cpp",
+    "firmware/esp32-sense/src/mqtt_client.cpp",
+    "firmware/esp32-sense/src/ntp_time.cpp",
+    "firmware/esp32-sense/src/s3_uploader.cpp",
+    "firmware/esp32-sense/src/sd_storage.cpp",
+    "firmware/esp32-sense/src/upload_scheduler.cpp",
+    "firmware/esp32-sense/src/wav_writer.cpp",
+    "firmware/esp32-sense/src/wifi_manager.cpp",
+    "firmware/esp32-sense/test/test_sigv4/test_sigv4.cpp"
+  ],
+  "sessions": [
+    {
+      "metadata": "/75/5214bfe8ef/0/metadata.json",
+      "transcript": "/75/5214bfe8ef/0/full.jsonl",
+      "compact_transcript": "/75/5214bfe8ef/0/transcript.jsonl",
+      "content_hash": "/75/5214bfe8ef/0/content_hash.txt",
+      "prompt": "/75/5214bfe8ef/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 234,
+    "cache_creation_tokens": 244788,
+    "cache_read_tokens": 19524935,
+    "output_tokens": 102406,
+    "api_call_count": 117
+  }
+}

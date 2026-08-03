@@ -9,9 +9,24 @@ external_background_ratio: 0.5
 
 augmentation:
   # Target signal-to-noise ratios (dB) for synthetic front_doorbell samples,
-  # doorbell = signal, everything else = noise. Spans noise-dominant (-5dB)
+  # doorbell = signal, everything else = noise. Spans deeply buried (-15dB)
   # to clearly audible (+15dB) to cover realistic in-the-wild conditions.
-  snrs_db: [-5, 0, 5, 10, 15]
+  # The -15/-10 levels exist to break a metric ceiling: on the -5..15 sweep
+  # every feature variant scored val_f1 1.0 on a ~230-chunk fold, which
+  # can't separate them. At -15dB the bell sits ~32x below the noise in
+  # power -- hard but still tractable from its narrowband harmonics, where
+  # -20dB would be closer to unlabelable. Relies on the bell-like ESC-50
+  # classes staying excluded (see noise_pools.esc50): with those in the
+  # pool, a noise-dominated mix labeled front_doorbell would teach the
+  # model that any bell is the doorbell.
+  snrs_db:
+  - -15
+  - -10
+  - -5
+  - 0
+  - 5
+  - 10
+  - 15
   # How many random noise chunks to pair with each real doorbell chunk, per SNR
   pairs_per_signal_chunk: 2
   # Uniform loudness jitter (+/- dB) applied to each mixed sample so synthetic
@@ -21,31 +36,101 @@ augmentation:
   # pool is chosen uniformly first, then a window within it, so the small
   # labeled-background pool isn't drowned out by these much larger ones.
   external_noise_pools:
-    - data/noise/esc50
-    - data/noise/demand
-
+  - data/noise/esc50
+  - data/noise/demand
 noise_pools:
   esc50:
     # Bell-like classes are excluded: at the low end of the SNR sweep the
     # noise dominates the mixture, and a mostly-bell sample labeled
     # front_doorbell would teach the model that other bells are doorbells.
-    exclude_categories: [church_bells, clock_alarm]
+    exclude_categories:
+    - church_bells
+    - clock_alarm
   demand:
     # Domestic environments plus a hallway — closest to the deployed setting.
     # Other options: OOFFICE, OMEETING, PCAFETER, PRESTO, PSTATION, TBUS,
     # TCAR, TMETRO, SPSQUARE, STRAFFIC, SCAFE, NFIELD, NPARK, NRIVER
-    environments: [DKITCHEN, DLIVING, DWASHING, OHALLWAY]
+    environments:
+    - DKITCHEN
+    - DLIVING
+    - DWASHING
+    - OHALLWAY
 
+# Which feature representation to build. `type` selects an entry in
+# src/features.py, which owns both the transform and the matching chunk
+# slicer; the remaining keys are that entry's parameters. Swapping
+# representation is `dvc exp run -S feature_extraction.type=...` rather than
+# a branch — see the variant table in README/CLAUDE.md.
+#
+# The default geometry targets ESP32-S3 inference: the first conv activation
+# (n_mels x n_frames x 32) is what has to fit in SRAM, and 40x100 lands at
+# ~125 KB int8 (internal SRAM) vs ~1 MB for the 129x250 STFT variant.
+# hop_length 320 = 20 ms, so a 2000 ms chunk is exactly 100 frames.
+#
+# features_dir must be distinct per geometry, so variants can coexist on
+# disk. extract_features.py stamps a feature_config.json into it and
+# draw_data.py refuses to slice arrays whose stamp disagrees with these
+# params, which is the backstop if two configs ever do share a directory.
 feature_extraction:
-  n_mfcc: 13
-  n_fft: 512
+  type: logmel
+  features_dir: ./data/features/logmel-40mel-320hop
+  n_mels: 40
+  n_fft: 512 # 32 ms @ 16 kHz
+  hop_length: 320 # 20 ms
+  fmin: 50
+  fmax: 8000
+  log_offset: 1.0e-6
 
 training:
   test_size: 0.2
-
-model:
-  n_estimators: 25
-  max_depth: 6
-  learning_rate: 0.1
+  # Seed for the split, and for whichever head trains on it (offset per
+  # fold, so each fold is independently reproducible)
   random_state: 42
-  eval_metric: ["logloss", "error"]
+  # How many CV folds to actually train and score. null = all of them
+  # (1/test_size), which is what makes val_f1_score a mean with a _std
+  # rather than one lucky split. Set to 1 for a fast iteration loop --
+  # it reproduces the old single-fold behaviour, at the old credibility.
+  n_eval_folds: null
+  # Which model family trains on the chunks: `cnn` (src/train_cnn.py) keeps
+  # the 2D (bins, frames) structure, `xgboost` (src/train_xgboost.py)
+  # flattens it. yamnet features only work with the xgboost head — its
+  # slicer pools the time axis away — and train_model.py enforces that.
+  head: cnn
+
+# Per-head hyperparameters. Nested because the two heads share nothing: a
+# flat block meant XGBoost silently received the CNN's learning_rate (0.001,
+# against xgboost's default 100 estimators) plus dropout/epochs as unknown
+# kwargs, and barely learned at all.
+model:
+  cnn:
+    learning_rate: 0.001
+    batch_size: 32
+    epochs: 100
+    early_stopping_patience: 10
+    dropout: 0.3
+  xgboost:
+    n_estimators: 25
+    max_depth: 6
+    learning_rate: 0.1
+    eval_metric: ["logloss", "error"]
+
+# int8 quantization for the ESP32-S3, plus the evaluation that gates it. Runs
+# for every variant so candidates are ranked after quantization, not before;
+# non-cnn heads record a skip.
+quantization:
+  # Chunks drawn from the training fold to calibrate activation ranges. The
+  # selection is written to data/calibration/ and tracked by DVC.
+  calibration_samples: 500
+  # Gate: fail if int8 quantization costs more in-sample F1 than this.
+  # Silent quantization collapse is the most likely way a variant produces a
+  # model that looks fine offline and does not work on device. Loose on
+  # purpose -- 0.01 is ~18 chunks of the 1770, well above the single-chunk
+  # noise a borderline sample produces, so it detects a collapse rather than
+  # drift. max_score_deviation is the sensitive number, and is observational.
+  max_f1_drop: 0.01
+  # fail: a breach stops the pipeline, so a bad model cannot become the
+  # artifact that gets pushed and flashed. warn: log it and continue --
+  # deliberate exploration only, recorded here rather than in
+  # someone's shell history. Either way the MLflow run records the verdict and the per-chunk
+  # diagnostics, and a breach marks that run FAILED.
+  on_failure: fail

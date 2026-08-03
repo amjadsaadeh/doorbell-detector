@@ -104,7 +104,7 @@ stages:
       md5: 7f431ecef78783885462ab82a0a0c919
       size: 474938
   extract_features:
-    cmd: python src/extract_mfcc_features.py
+    cmd: python src/extract_features.py
     deps:
     - path: data/audio
       hash: md5
@@ -113,9 +113,13 @@ stages:
       nfiles: 51
     - path: data/augmented_audio
       hash: md5
-      md5: 7e03bb91d71e0e8910f9b65e45595032.dir
-      size: 37785960
-      nfiles: 590
+      md5: 21b6c5c280f4d1d214c4f0ffa202c358.dir
+      size: 52900344
+      nfiles: 826
+    - path: data/chunk_manifest.csv
+      hash: md5
+      md5: dbc9fb19a9751195127ca6390593c8bc
+      size: 261591
     - path: data/noise/demand
       hash: md5
       md5: 1d9ac0c06a853fd4dc33d7c4493d3a50.dir
@@ -126,38 +130,53 @@ stages:
       md5: 85588592640f55e87116bdd3aff2a4bb.dir
       size: 307284480
       nfiles: 1920
-    - path: src/extract_mfcc_features.py
+    - path: src/audio_sources.py
       hash: md5
-      md5: 649d32b1c84af6f869345034c9079fc3
-      size: 2816
+      md5: 2acd279bad2c41bcd697ed6e3ada19c3
+      size: 2406
+    - path: src/extract_features.py
+      hash: md5
+      md5: 6da9cb8078eceb8473e0047e1598389d
+      size: 3088
+    - path: src/features.py
+      hash: md5
+      md5: 8acb8eab1ae16c8b641e62f6001cec78
+      size: 11506
+    - path: src/paths.py
+      hash: md5
+      md5: fc3a9cee0d8d5691274d5414c3c4f7a6
+      size: 1778
     params:
       params.yaml:
-        augmentation.external_noise_pools:
-        - data/noise/esc50
-        - data/noise/demand
         feature_extraction:
-          n_mfcc: 13
+          type: logmel
+          features_dir: ./data/features/logmel-40mel-320hop
+          n_mels: 40
           n_fft: 512
+          hop_length: 320
+          fmin: 50
+          fmax: 8000
+          log_offset: 1e-06
     outs:
-    - path: data/mfcc_data/
+    - path: ./data/features/logmel-40mel-320hop
       hash: md5
-      md5: ce529fad2251baa58f9477a3215a2d9f.dir
-      size: 20623400
-      nfiles: 2565
+      md5: 63e276d41686cac534e10bc3ae88c8da.dir
+      size: 39646382
+      nfiles: 1206
   train_model:
-    cmd: python src/train_xgboost.py
+    cmd: python src/train_model.py
     deps:
     - path: data/balanced_data.h5
       hash: md5
-      md5: 7c22a0fafc2b91f2d228a28154151643
-      size: 5447496
+      md5: 3ec8f18840364ab765d423393433b193
+      size: 28326144
     - path: data/data_quality/chunk_balanced_quality.json
       hash: md5
-      md5: 567e53b8e1cbd34a94241d3182c3c925
-      size: 104
+      md5: 2e65d6f69a2aa9005f4f9c5042f48f23
+      size: 105
     - path: data/data_quality/chunks_per_label.csv
       hash: md5
-      md5: dd331473138c91c8ebe986ef2dbe6e07
+      md5: 58caac3641437386a1f528be84c542d3
       size: 42
     - path: data/data_quality/sample_based_quality.json
       hash: md5
@@ -167,79 +186,114 @@ stages:
       hash: md5
       md5: b1a872921f089791572da317cc8646b2
       size: 55
+    - path: src/dataset.py
+      hash: md5
+      md5: e871662e2c832be3138a06df5980f506
+      size: 3262
+    - path: src/features.py
+      hash: md5
+      md5: 8acb8eab1ae16c8b641e62f6001cec78
+      size: 11506
+    - path: src/oof.py
+      hash: md5
+      md5: 2e9be25223b6d65a5f2d9d4c800d223a
+      size: 7108
+    - path: src/paths.py
+      hash: md5
+      md5: fc3a9cee0d8d5691274d5414c3c4f7a6
+      size: 1778
+    - path: src/provenance.py
+      hash: md5
+      md5: fb35b1ee0e47a7c53e47340ebbca069f
+      size: 2884
+    - path: src/train_cnn.py
+      hash: md5
+      md5: d4bb4670b13dae8556eece15afb1b963
+      size: 11463
+    - path: src/train_model.py
+      hash: md5
+      md5: 7afe6fd0ee2852f8e4ac8f3118715f1c
+      size: 1653
     - path: src/train_xgboost.py
       hash: md5
-      md5: 2af970a02427a5939eacafe96172b24c
-      size: 6647
+      md5: faa0cb70c88c812a0a3908a8f0db93b7
+      size: 9678
     params:
       params.yaml:
         model:
-          n_estimators: 25
-          max_depth: 6
-          learning_rate: 0.1
-          random_state: 42
-          eval_metric:
-          - logloss
-          - error
+          cnn:
+            learning_rate: 0.001
+            batch_size: 32
+            epochs: 100
+            early_stopping_patience: 10
+            dropout: 0.3
+          xgboost:
+            n_estimators: 25
+            max_depth: 6
+            learning_rate: 0.1
+            eval_metric:
+            - logloss
+            - error
         training:
           test_size: 0.2
+          random_state: 42
+          n_eval_folds:
+          head: cnn
     outs:
-    - path: models/xgboost_model.json
+    - path: data/predictions
       hash: md5
-      md5: 68e9a5570452bf5691cc6a1d22a086ff
-      size: 50158
+      md5: 37842e7c4fb797d845b6de0242e2e663.dir
+      size: 387667
+      nfiles: 1
+    - path: models/trained
+      hash: md5
+      md5: c440e38ed48d14cd3e201331fe21171e.dir
+      size: 215459
+      nfiles: 2
   draw_data:
     cmd: python src/draw_data.py
     deps:
-    - path: data/annotation_per_row_data.csv
+    - path: ./data/features/logmel-40mel-320hop
       hash: md5
-      md5: 5b4e4aed8f6bdc5f7f12165ab4703003
-      size: 6187
-    - path: data/augmented_annotations.csv
+      md5: 63e276d41686cac534e10bc3ae88c8da.dir
+      size: 39646382
+      nfiles: 1206
+    - path: data/chunk_manifest.csv
       hash: md5
-      md5: d5e03769298bb73b1984c1978615f47a
-      size: 70016
-    - path: data/mfcc_data/
+      md5: dbc9fb19a9751195127ca6390593c8bc
+      size: 261591
+    - path: src/dataset.py
       hash: md5
-      md5: ce529fad2251baa58f9477a3215a2d9f.dir
-      size: 20623400
-      nfiles: 2565
-    - path: data/noise/demand
-      hash: md5
-      md5: 1d9ac0c06a853fd4dc33d7c4493d3a50.dir
-      size: 38400688
-      nfiles: 4
-    - path: data/noise/esc50
-      hash: md5
-      md5: 85588592640f55e87116bdd3aff2a4bb.dir
-      size: 307284480
-      nfiles: 1920
+      md5: e871662e2c832be3138a06df5980f506
+      size: 3262
     - path: src/draw_data.py
       hash: md5
-      md5: 4ced3eb486ed01205bae9d58d4ba3cb3
-      size: 9073
+      md5: ac167b374c6ea05c2ade9fe491d6e668
+      size: 2335
+    - path: src/features.py
+      hash: md5
+      md5: 8acb8eab1ae16c8b641e62f6001cec78
+      size: 11506
+    - path: src/paths.py
+      hash: md5
+      md5: fc3a9cee0d8d5691274d5414c3c4f7a6
+      size: 1778
     params:
       params.yaml:
-        augmentation.external_noise_pools:
-        - data/noise/esc50
-        - data/noise/demand
-        chunk_overlap: 250
-        chunk_size: 2000
-        external_background_ratio: 0.5
-        inbalance_ratio: 1.0
+        feature_extraction:
+          type: logmel
+          features_dir: ./data/features/logmel-40mel-320hop
+          n_mels: 40
+          n_fft: 512
+          hop_length: 320
+          fmin: 50
+          fmax: 8000
+          log_offset: 1e-06
     outs:
     - path: data/balanced_data.h5
       hash: md5
-      md5: 7c22a0fafc2b91f2d228a28154151643
-      size: 5447496
-    - path: data/data_quality/chunk_balanced_quality.json
-      hash: md5
-      md5: 567e53b8e1cbd34a94241d3182c3c925
-      size: 104
-    - path: data/data_quality/chunks_per_label.csv
-      hash: md5
-      md5: dd331473138c91c8ebe986ef2dbe6e07
-      size: 42
+      md5: 3ec8f18840364ab765d423393433b193
+      size: 28326144
   augmentation:
     cmd: python src/augment_data.py
     deps:
@@ -270,6 +324,8 @@ stages:
       params.yaml:
         augmentation:
           snrs_db:
+          - -15
+          - -10
           - -5
           - 0
           - 5
@@ -285,13 +341,13 @@ stages:
     outs:
     - path: data/augmented_annotations.csv
       hash: md5
-      md5: d5e03769298bb73b1984c1978615f47a
-      size: 70016
+      md5: 47e945cf4d50f6106bf8a53cc2bda7dc
+      size: 99344
     - path: data/augmented_audio
       hash: md5
-      md5: 7e03bb91d71e0e8910f9b65e45595032.dir
-      size: 37785960
-      nfiles: 590
+      md5: 21b6c5c280f4d1d214c4f0ffa202c358.dir
+      size: 52900344
+      nfiles: 826
   fetch_noise_demand:
     cmd: python src/fetch_noise_demand.py
     deps:
@@ -340,3 +396,251 @@ stages:
       md5: 85588592640f55e87116bdd3aff2a4bb.dir
       size: 307284480
       nfiles: 1920
+  select_chunks:
+    cmd: python src/select_chunks.py
+    deps:
+    - path: data/annotation_per_row_data.csv
+      hash: md5
+      md5: 5b4e4aed8f6bdc5f7f12165ab4703003
+      size: 6187
+    - path: data/audio
+      hash: md5
+      md5: 76e7b567abe76d809d629e6189db13d2.dir
+      size: 14636020
+      nfiles: 51
+    - path: data/augmented_annotations.csv
+      hash: md5
+      md5: 47e945cf4d50f6106bf8a53cc2bda7dc
+      size: 99344
+    - path: data/augmented_audio
+      hash: md5
+      md5: 21b6c5c280f4d1d214c4f0ffa202c358.dir
+      size: 52900344
+      nfiles: 826
+    - path: data/noise/demand
+      hash: md5
+      md5: 1d9ac0c06a853fd4dc33d7c4493d3a50.dir
+      size: 38400688
+      nfiles: 4
+    - path: data/noise/esc50
+      hash: md5
+      md5: 85588592640f55e87116bdd3aff2a4bb.dir
+      size: 307284480
+      nfiles: 1920
+    - path: src/audio_sources.py
+      hash: md5
+      md5: 2acd279bad2c41bcd697ed6e3ada19c3
+      size: 2406
+    - path: src/dataqualityutils.py
+      hash: md5
+      md5: f82f10a07cb625672405ffaab186e930
+      size: 639
+    - path: src/paths.py
+      hash: md5
+      md5: fc3a9cee0d8d5691274d5414c3c4f7a6
+      size: 1778
+    - path: src/select_chunks.py
+      hash: md5
+      md5: 9031b4de5fa00e76adc988adad64d8fa
+      size: 7174
+    params:
+      params.yaml:
+        augmentation.external_noise_pools:
+        - data/noise/esc50
+        - data/noise/demand
+        chunk_overlap: 250
+        chunk_size: 2000
+        external_background_ratio: 0.5
+        inbalance_ratio: 1.0
+    outs:
+    - path: data/chunk_manifest.csv
+      hash: md5
+      md5: dbc9fb19a9751195127ca6390593c8bc
+      size: 261591
+    - path: data/data_quality/chunk_balanced_quality.json
+      hash: md5
+      md5: 2e65d6f69a2aa9005f4f9c5042f48f23
+      size: 105
+    - path: data/data_quality/chunks_per_label.csv
+      hash: md5
+      md5: 58caac3641437386a1f528be84c542d3
+      size: 42
+  export_model:
+    cmd: python src/export_tflite.py
+    deps:
+    - path: data/balanced_data.h5
+      hash: md5
+      md5: e433ebbea9b538a5ef0a858d94757fdb
+      size: 29667272
+    - path: models/trained
+      hash: md5
+      md5: 26afc24c02fff25a639f0b2bbfa35edc.dir
+      size: 215369
+      nfiles: 2
+    - path: src/export_tflite.py
+      hash: md5
+      md5: 9e5294f2c0dcac2e3a9c255cd4a98b71
+      size: 11573
+    - path: src/paths.py
+      hash: md5
+      md5: a03368e21b3148e0cd1a65b4c5c234da
+      size: 564
+    - path: src/train_cnn.py
+      hash: md5
+      md5: 348a4912b1b213ff07bcb9a14603770f
+      size: 9364
+    - path: src/train_xgboost.py
+      hash: md5
+      md5: 526d2db35cf13f1609b2ddb624c6ad59
+      size: 8001
+    params:
+      params.yaml:
+        export:
+          representative_samples: 500
+          max_f1_drop: 0.01
+        model.cnn:
+          learning_rate: 0.001
+          batch_size: 32
+          epochs: 100
+          early_stopping_patience: 10
+          dropout: 0.3
+        training:
+          test_size: 0.2
+          random_state: 42
+          n_eval_folds:
+          head: cnn
+    outs:
+    - path: models/export
+      hash: md5
+      md5: 0e4099f440ceebdc1f1c812893040892.dir
+      size: 197687
+      nfiles: 3
+    - path: models/tflite_metrics.json
+      hash: md5
+      md5: 8ae1a58ab73838323c8e6edd8f73395e
+      size: 582
+  quantize_model:
+    cmd: python src/quantize_model.py
+    deps:
+    - path: data/balanced_data.h5
+      hash: md5
+      md5: 3ec8f18840364ab765d423393433b193
+      size: 28326144
+    - path: data/chunk_manifest.csv
+      hash: md5
+      md5: dbc9fb19a9751195127ca6390593c8bc
+      size: 261591
+    - path: models/trained
+      hash: md5
+      md5: c440e38ed48d14cd3e201331fe21171e.dir
+      size: 215459
+      nfiles: 2
+    - path: src/dataset.py
+      hash: md5
+      md5: e871662e2c832be3138a06df5980f506
+      size: 3262
+    - path: src/paths.py
+      hash: md5
+      md5: fc3a9cee0d8d5691274d5414c3c4f7a6
+      size: 1778
+    - path: src/quantize_model.py
+      hash: md5
+      md5: 775e74580972c1cc8ec87ebb89928a3f
+      size: 5238
+    - path: src/tflite_utils.py
+      hash: md5
+      md5: d627677952f29914a9af0051ae6a506c
+      size: 4654
+    - path: src/train_cnn.py
+      hash: md5
+      md5: d4bb4670b13dae8556eece15afb1b963
+      size: 11463
+    params:
+      params.yaml:
+        quantization.calibration_samples: 500
+        training:
+          test_size: 0.2
+          random_state: 42
+          n_eval_folds:
+          head: cnn
+    outs:
+    - path: data/calibration
+      hash: md5
+      md5: 18752f470ff52725c06808e1d8bd18dd.dir
+      size: 6872139
+      nfiles: 2
+    - path: models/export
+      hash: md5
+      md5: 80f9d32fd056d89eb53ac6ab27947d34.dir
+      size: 198331
+      nfiles: 3
+  evaluate_quantized:
+    cmd: python src/evaluate_quantized.py
+    deps:
+    - path: data/balanced_data.h5
+      hash: md5
+      md5: 3ec8f18840364ab765d423393433b193
+      size: 28326144
+    - path: data/calibration
+      hash: md5
+      md5: 18752f470ff52725c06808e1d8bd18dd.dir
+      size: 6872139
+      nfiles: 2
+    - path: models/export
+      hash: md5
+      md5: 80f9d32fd056d89eb53ac6ab27947d34.dir
+      size: 198331
+      nfiles: 3
+    - path: models/trained
+      hash: md5
+      md5: c440e38ed48d14cd3e201331fe21171e.dir
+      size: 215459
+      nfiles: 2
+    - path: src/dataset.py
+      hash: md5
+      md5: e871662e2c832be3138a06df5980f506
+      size: 3262
+    - path: src/evaluate_quantized.py
+      hash: md5
+      md5: 63685f15a2ef98631ab44b2b420d6863
+      size: 11709
+    - path: src/paths.py
+      hash: md5
+      md5: fc3a9cee0d8d5691274d5414c3c4f7a6
+      size: 1778
+    - path: src/provenance.py
+      hash: md5
+      md5: fb35b1ee0e47a7c53e47340ebbca069f
+      size: 2884
+    - path: src/quantize_model.py
+      hash: md5
+      md5: 775e74580972c1cc8ec87ebb89928a3f
+      size: 5238
+    - path: src/tflite_utils.py
+      hash: md5
+      md5: d627677952f29914a9af0051ae6a506c
+      size: 4654
+    - path: src/train_cnn.py
+      hash: md5
+      md5: d4bb4670b13dae8556eece15afb1b963
+      size: 11463
+    - path: src/train_xgboost.py
+      hash: md5
+      md5: faa0cb70c88c812a0a3908a8f0db93b7
+      size: 9678
+    params:
+      params.yaml:
+        quantization:
+          calibration_samples: 500
+          max_f1_drop: 0.01
+          on_failure: fail
+        training:
+          test_size: 0.2
+          random_state: 42
+          n_eval_folds:
+          head: cnn
+    outs:
+    - path: models/quantized_metrics.json
+      hash: md5
+      md5: dd4f85b5349793d764ab176348158846
+      size: 734

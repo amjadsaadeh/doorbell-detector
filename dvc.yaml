@@ -1,4 +1,11 @@
 stages:
+  fetch_labeled_data:
+    cmd: ./src/fetch_data.sh
+    deps:
+    - src/fetch_data.sh
+    outs:
+    - data/labeled_data.csv
+
   convert_labeled_data:
     cmd: python src/convert_labeled_data.py
     deps:
@@ -6,12 +13,7 @@ stages:
     - src/convert_labeled_data.py
     outs:
     - data/annotation_per_row_data.csv
-  fetch_labeled_data:
-    cmd: ./src/fetch_data.sh
-    deps:
-    - src/fetch_data.sh
-    outs:
-    - data/labeled_data.csv
+
   download_audio:
     cmd: python ./src/download_audio.py --target-dir data/audio --annotations-file
       data/annotation_per_row_data.csv
@@ -21,6 +23,7 @@ stages:
     outs:
     - data/audio:
         persist: true
+
   extract_data_quality:
     cmd: python ./src/extract_data_quality.py
     deps:
@@ -29,6 +32,7 @@ stages:
     outs:
     - data/data_quality/sample_based_quality.json
     - data/data_quality/samples_per_label.csv
+
   fetch_noise_esc50:
     cmd: python src/fetch_noise_esc50.py
     deps:
@@ -65,54 +69,135 @@ stages:
     - data/augmented_audio
     - data/augmented_annotations.csv
 
-  extract_features:
-    cmd: python src/extract_mfcc_features.py
+  # Which chunks make up the dataset. Deliberately free of any
+  # feature_extraction param: every representation trains on the same chunks
+  # in the same order, and sweeping features reuses this stage's cache.
+  select_chunks:
+    cmd: python src/select_chunks.py
     deps:
+    - data/annotation_per_row_data.csv
+    - data/augmented_annotations.csv
     - data/audio
     - data/augmented_audio
     - data/noise/esc50
     - data/noise/demand
-    - src/extract_mfcc_features.py
+    - src/select_chunks.py
+    - src/audio_sources.py
+    - src/dataqualityutils.py
+    - src/paths.py
     params:
-    - feature_extraction
+    - chunk_size
+    - chunk_overlap
+    - inbalance_ratio
+    - external_background_ratio
     - augmentation.external_noise_pools
     outs:
-    - data/mfcc_data/
+    - data/chunk_manifest.csv
+    - data/data_quality/chunks_per_label.csv
+    - data/data_quality/chunk_balanced_quality.json
+
+  # Downstream of select_chunks, so only the files a chunk references get
+  # extracted rather than every wav in every source.
+  extract_features:
+    cmd: python src/extract_features.py
+    deps:
+    - data/chunk_manifest.csv
+    - data/audio
+    - data/augmented_audio
+    - data/noise/esc50
+    - data/noise/demand
+    - src/extract_features.py
+    - src/features.py
+    - src/audio_sources.py
+    - src/paths.py
+    params:
+    - feature_extraction
+    outs:
+    - ${feature_extraction.features_dir}
 
   draw_data:
     cmd: python src/draw_data.py
-    params:
-    - inbalance_ratio
-    - external_background_ratio
-    - chunk_size
-    - chunk_overlap
-    - augmentation.external_noise_pools
     deps:
-    - data/annotation_per_row_data.csv
-    - data/augmented_annotations.csv
-    - data/mfcc_data/
-    - data/noise/esc50
-    - data/noise/demand
+    - data/chunk_manifest.csv
+    - ${feature_extraction.features_dir}
     - src/draw_data.py
+    - src/dataset.py
+    - src/features.py
+    - src/paths.py
+    params:
+    - feature_extraction
     outs:
     - data/balanced_data.h5
-    - data/data_quality/chunk_balanced_quality.json
-    - data/data_quality/chunks_per_label.csv
 
   train_model:
-    cmd: python src/train_xgboost.py
+    cmd: python src/train_model.py
     deps:
     - data/balanced_data.h5
     - data/data_quality/sample_based_quality.json
     - data/data_quality/samples_per_label.csv
     - data/data_quality/chunk_balanced_quality.json
     - data/data_quality/chunks_per_label.csv
+    - src/train_model.py
+    - src/train_cnn.py
     - src/train_xgboost.py
+    - src/dataset.py
+    - src/features.py
+    - src/oof.py
+    - src/provenance.py
+    - src/paths.py
     params:
     - model
     - training
     outs:
-    - models/xgboost_model.json
+    - models/trained
+    # Held-out per-chunk predictions. Tracked because they can only be
+    # produced inside the fold loop: the shipped model is refit on
+    # everything, so no later stage can recompute an honest one.
+    - data/predictions
+
+  # In the default DAG so candidates are ranked on their post-quantization
+  # score; non-cnn heads write a skip marker instead of a model.
+  quantize_model:
+    cmd: python src/quantize_model.py
+    deps:
+    - data/balanced_data.h5
+    - data/chunk_manifest.csv
+    - models/trained
+    - src/quantize_model.py
+    - src/tflite_utils.py
+    - src/train_cnn.py
+    - src/dataset.py
+    - src/paths.py
+    params:
+    - quantization.calibration_samples
+    - training
+    outs:
+    - models/export
+    - data/calibration
+
+  # Separate stage from the one that produced the model, so what decides
+  # whether it ships is not the same code path that built it.
+  evaluate_quantized:
+    cmd: python src/evaluate_quantized.py
+    deps:
+    - data/balanced_data.h5
+    - models/trained
+    - models/export
+    - data/calibration
+    - src/evaluate_quantized.py
+    - src/quantize_model.py
+    - src/tflite_utils.py
+    - src/train_cnn.py
+    - src/train_xgboost.py
+    - src/dataset.py
+    - src/provenance.py
+    - src/paths.py
+    params:
+    - quantization
+    - training
+    metrics:
+    - models/quantized_metrics.json:
+        cache: false
 
 metrics:
 - data/data_quality/sample_based_quality.json

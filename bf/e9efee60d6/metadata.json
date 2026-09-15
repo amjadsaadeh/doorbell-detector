@@ -1,0 +1,31 @@
+{
+  "cli_version": "0.9.0",
+  "checkpoint_id": "bfe9efee60d6",
+  "strategy": "manual-commit",
+  "branch": "mlflow-run-organization",
+  "checkpoints_count": 3,
+  "files_touched": [
+    "CLAUDE.md",
+    "src/evaluate_quantized.py",
+    "src/tracking.py",
+    "src/train_cnn.py",
+    "src/train_xgboost.py",
+    "tests/tracking_test.py"
+  ],
+  "sessions": [
+    {
+      "metadata": "/bf/e9efee60d6/0/metadata.json",
+      "transcript": "/bf/e9efee60d6/0/full.jsonl",
+      "compact_transcript": "/bf/e9efee60d6/0/transcript.jsonl",
+      "content_hash": "/bf/e9efee60d6/0/content_hash.txt",
+      "prompt": "/bf/e9efee60d6/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 140,
+    "cache_creation_tokens": 135889,
+    "cache_read_tokens": 7861125,
+    "output_tokens": 63304,
+    "api_call_count": 70
+  }
+}

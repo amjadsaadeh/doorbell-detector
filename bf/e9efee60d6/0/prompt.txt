@@ -1,0 +1,9 @@
+Currently the data within my mlflow instance is cluttered and quite hard to interpret for me. How do I improve this, expecially when it comes to compare my different model runs?
+
+---
+
+yes
+
+---
+
+yes apply

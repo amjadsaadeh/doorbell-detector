@@ -52,7 +52,16 @@ RUN_HANDOFF = MODEL_DIR / "mlflow_run.json"
 # stages, so it is always modified while a stage executes. Counting it as a
 # dirty working tree would mark every single run +dirty and make the marker
 # meaningless.
-_DIRT_PATHSPEC = [".", ":(exclude)dvc.lock"]
+_ALWAYS_EXCLUDED = [":(exclude)dvc.lock"]
+
+# params.yaml is the same story for `dvc exp run -S`: DVC applies the
+# overrides by rewriting it in the experiment worktree and records that
+# rewrite in the experiment itself, so it is reproducible via `dvc exp`, not
+# lost. Without this, all three --temp variants of the first clean sweep came
+# out +dirty while the workspace held nothing uncommitted. Excluded only under
+# an experiment: in a plain `dvc repro`, a hand-edited params.yaml is exactly
+# the uncommitted change the marker exists to flag.
+_EXPERIMENT_EXCLUDED = [":(exclude)params.yaml"]
 
 
 def _git(*args: str, default: str = "") -> str:
@@ -78,8 +87,11 @@ def is_dirty() -> bool:
     the pipeline itself are untracked by design and say nothing about whether
     the *code and params* that produced a run are recoverable.
     """
+    pathspec = [".", *_ALWAYS_EXCLUDED]
+    if dvc_exp_name():
+        pathspec += _EXPERIMENT_EXCLUDED
     return bool(
-        _git("status", "--porcelain", "--untracked-files=no", "--", *_DIRT_PATHSPEC)
+        _git("status", "--porcelain", "--untracked-files=no", "--", *pathspec)
     )
 
 
@@ -166,14 +178,34 @@ def read_run_handoff() -> str | None:
         return None
 
 
+def promotes_champion(passed: bool) -> bool:
+    """Whether this run may move the `champion` alias.
+
+    Two conditions, and the second is the one that was missing. The gate has
+    to pass -- but passing only means int8 did not damage the float model. It
+    says nothing about whether this model beats the one already shipping, so
+    the gate alone let every passing sweep variant take the alias in turn: the
+    first clean sweep ended with @champion on stft (val_f1 0.8888) instead of
+    logmel (0.9931), purely because stft ran later.
+
+    What ships is the committed default configuration, which is what a plain
+    `dvc repro` runs. A `dvc exp run` variant is exploration: registered and
+    inspectable, but promoting one is a deliberate act -- commit its params,
+    or set the alias by hand.
+    """
+    return passed and dvc_exp_name() is None
+
+
 def register_int8_model(run_id: str, artifact_uri: str, passed: bool, tags: dict):
-    """Register the int8 graph, aliasing it `champion` only if it passed.
+    """Register the int8 graph; alias it `champion` only if promotes_champion.
 
     The registry is what answers "which run produced the .tflite on the
-    device". Aliasing on the gate verdict means the alias can only ever point
-    at a model the gate approved, while failed versions stay registered and
-    inspectable rather than vanishing.
+    device". Every version is registered, failed and swept ones included, so
+    none vanish; each carries a `promoted` tag, so a version without the alias
+    records why rather than leaving it to be guessed.
     """
+    promote = promotes_champion(passed)
+    tags = {**tags, "promoted": str(promote).lower()}
     client = mlflow.MlflowClient()
     try:
         client.create_registered_model(REGISTERED_MODEL_NAME)
@@ -187,7 +219,7 @@ def register_int8_model(run_id: str, artifact_uri: str, passed: bool, tags: dict
         run_id=run_id,
         tags={k: str(v) for k, v in tags.items()},
     )
-    if passed:
+    if promote:
         client.set_registered_model_alias(
             REGISTERED_MODEL_NAME, CHAMPION_ALIAS, version.version
         )

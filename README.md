@@ -288,7 +288,7 @@ Runs are tracked in MLflow (experiment `doorbell-detector`), named `<head>-<feat
 
 - **`val_f1_score`** (± `val_f1_score_std`) — the cross-validated mean. **This is the only generalisation estimate.** Quote this one.
 - **`insample_full_*`** — the final model scored on its own training data. A did-it-fit check, never a performance claim.
-- **`float_insample_*` / `int8_insample_*`** on the `-quantized` run — a float-vs-int8 *delta*, tagged `metric_scope`. It says what quantization changed, not how good the model is.
+- **`float_insample_*` / `int8_insample_*`** on the `-int8` child run — a float-vs-int8 *delta*, tagged `metric_scope`. It says what quantization changed, not how good the model is.
 
 The shipped model is refit on 100% of the data, so it has no held-out data of its own. If you ever need a held-out number for those exact weights, carve out a fixed holdout before cross-validation — it cannot come from the quantization stage.
 

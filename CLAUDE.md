@@ -63,9 +63,10 @@ full parameter reference and the per-stage command list.
   chunks would tune the ranges to the data the next stage scores against — and the
   saved `row_index` values are dataset-global, so they join straight back to
   `chunk_manifest.csv` (`calibration_manifest.csv` is the human-readable view).
-- **`evaluate_quantized` logs its own MLflow run**, named after the training run with a
-  `-quantized` suffix (e.g. `cnn-logmel-unified-pipeline-quantized`, tagged
-  `stage=quantized`). It carries the calibration `.npz` + `.csv` as artifacts and its
+- **`evaluate_quantized` logs its own MLflow run**, a child of the training run named
+  with an `-int8` suffix (e.g. `cnn-logmel@0219987-int8`, tagged `stage=quantized`).
+  Runs from before `src/tracking.py` used `-quantized` and, earlier, `tflite-int8-*`;
+  those live in the `doorbell-detector-legacy` experiment. It carries the calibration `.npz` + `.csv` as artifacts and its
   md5 as a param, so a quantized model in MLflow can be matched to a DVC-tracked
   calibration set. `quantization.max_f1_drop` fails the stage on collapse.
 - **The quantized run measures a delta, not quality**, and is tagged
@@ -115,8 +116,11 @@ full parameter reference and the per-stage command list.
   records for `balanced_data.h5`, so a run traces to an exact `dvc pull`-able dataset —
   and because both stages now tag it, a model and its int8 counterpart can be joined.
   A `+dirty` suffix on the run name marks a run whose tracked source did not match its
-  commit; `dvc.lock` is excluded from that check, since the `dvc repro` running the
-  stage rewrites it and would otherwise mark every run dirty.
+  commit. `dvc.lock` is always excluded from that check, since the `dvc repro` running
+  the stage rewrites it and would otherwise mark every run dirty. Under `dvc exp run`,
+  `params.yaml` is excluded too: `-S` applies overrides by rewriting it, and DVC records
+  that rewrite in the experiment. Without that second exclusion every swept variant of
+  the first clean sweep came out `+dirty` with nothing actually uncommitted.
 - **Per-fold metrics are steps, not key prefixes.** `mlflow.log_metrics(…, step=fold)`
   under `byfold_*`. The old `fold{i}_<metric>` prefix minted a new metric key per fold —
   40 of them at five folds — and each became a permanent column in the cross-run
@@ -130,10 +134,14 @@ full parameter reference and the per-stage command list.
   a dependency of both downstream stages, so the handoff travels the dependency graph
   and needed no `dvc.yaml` change. `evaluate_quantized` reads it and passes
   `parent_run_id`. A missing file is not an error: the run logs top-level, as before.
-- **The int8 graph is registered** as `doorbell-detector-int8`, aliased `@champion`
-  only when the gate passes. This is what makes "which run produced the `.tflite` on
-  the device" a lookup rather than an md5 hunt. Gate-failed versions are still
-  registered and inspectable, they just never receive the alias.
+- **The int8 graph is registered** as `doorbell-detector-int8`. This is what makes
+  "which run produced the `.tflite` on the device" a lookup rather than an md5 hunt.
+  `@champion` moves only when the gate passes **and** the run is a plain `dvc repro`
+  of the committed config, never a `dvc exp run` variant (`tracking.promotes_champion`).
+  The gate alone is not enough: it measures quantization damage, not quality, so on the
+  first clean sweep every passing variant took the alias in turn and it ended on stft
+  (0.8888) instead of logmel (0.9931). Every version is still registered, with a
+  `promoted` tag; to ship a variant, commit its params or set the alias by hand.
 - **Label Studio auth** is a JWT personal access token: `fetch_data.sh` exchanges it
   via `/api/token/refresh` for a Bearer token (legacy `Token` header returns 401).
 - **Incrementality:** `data/audio` is a `persist: true` output — unchanged labels skip
@@ -183,7 +191,7 @@ full parameter reference and the per-stage command list.
   and fold 0 is the smallest and easiest. The same log-mel model that scores 1.0000 on
   fold 0 scores **0.9931 ± 0.0095, worst fold 0.9742** across all five. MLflow gets the
   mean under the plain name (`val_f1_score`) plus `_std` / `_min` companions and
-  per-fold `fold{i}_*` metrics. `training.n_eval_folds: null` means all folds; set it
+  per-fold `byfold_*` metrics, one key each, stepped by fold. `training.n_eval_folds: null` means all folds; set it
   to 1 for a fast iteration loop, at the old credibility.
 - **The shipped model is a final refit on 100% of the chunks**, trained after the CV
   loop. CV establishes what a model built this way scores; the refit is the deliverable
@@ -269,7 +277,7 @@ matching, GPIO button trigger, Prometheus metrics/health endpoint.
 - Cross-correlation is slow enough to drop audio in saved clips if not handled carefully (see `c8c2788`)
 - Root `requirements.txt` was removed — `pyproject.toml`/`uv.lock` is the single source
   of pipeline dependencies (`data_collection/requirements.txt` remains for the Pi)
-- All 146 tests pass; run with `PYTHONPATH=./src:. uv run pytest tests/`
+- All 166 tests pass; run with `PYTHONPATH=./src:. uv run pytest tests/`
 
 ## Key Files
 

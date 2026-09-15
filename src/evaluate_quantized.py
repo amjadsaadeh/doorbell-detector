@@ -282,10 +282,15 @@ def main():
             print(f"tflite size   : {metrics['tflite_bytes'] / 1024:.1f} KB")
             print(f"peak tensor   : {metrics['peak_activation_bytes'] / 1024:.1f} KB")
             print(f"gate          : {'PASSED' if passed else 'FAILED'}")
-            print(
-                f"registered    : v{version.version}"
-                f"{' (champion)' if passed else ' (not aliased: gate failed)'}"
-            )
+            # Say *why* a version was not aliased: a sweep variant that passed
+            # is held back deliberately, which is not the same as failing.
+            if version.tags.get("promoted") == "true":
+                alias_note = " (champion)"
+            elif not passed:
+                alias_note = " (not aliased: gate failed)"
+            else:
+                alias_note = " (not aliased: dvc exp variant, promote by hand)"
+            print(f"registered    : v{version.version}{alias_note}")
 
             if not passed and on_failure == "fail":
                 raise SystemExit(

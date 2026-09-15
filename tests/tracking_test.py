@@ -146,3 +146,59 @@ def test_corrupt_handoff_is_not_an_error(tmp_path, monkeypatch):
 def test_quantized_run_name_marks_the_int8_graph(repo):
     train = tracking.run_name("cnn", "logmel")
     assert tracking.run_name("cnn", "logmel", suffix="-int8") == f"{train}-int8"
+
+
+def _commit_params(repo):
+    (repo / "params.yaml").write_text("feature_extraction:\n  type: logmel\n")
+    subprocess.run(["git", "add", "-A"], cwd=repo, check=True, capture_output=True)
+    subprocess.run(["git", "commit", "-qm", "params"], cwd=repo, check=True,
+                   capture_output=True)
+
+
+def test_params_rewrite_under_dvc_exp_is_not_dirty(repo, monkeypatch):
+    """`dvc exp run -S` applies overrides by rewriting params.yaml.
+
+    Before this exclusion all three --temp runs of the first clean sweep were
+    named +dirty with nothing actually uncommitted. DVC records the rewrite
+    in the experiment, so the run is reproducible via `dvc exp`.
+    """
+    _commit_params(repo)
+    monkeypatch.setenv("DVC_EXP_NAME", "vatic-dabs")
+    (repo / "params.yaml").write_text("feature_extraction:\n  type: mfcc\n")
+    assert tracking.is_dirty() is False
+
+
+def test_params_edit_outside_dvc_exp_is_dirty(repo, monkeypatch):
+    """In a plain repro an edited params.yaml is a real uncommitted change."""
+    _commit_params(repo)
+    monkeypatch.delenv("DVC_EXP_NAME", raising=False)
+    (repo / "params.yaml").write_text("feature_extraction:\n  type: mfcc\n")
+    assert tracking.is_dirty() is True
+
+
+def test_dvc_exp_does_not_hide_real_source_changes(repo, monkeypatch):
+    """The params.yaml exclusion must not become a blanket pass for exp runs."""
+    monkeypatch.setenv("DVC_EXP_NAME", "vatic-dabs")
+    (repo / "file.txt").write_text("uncommitted change\n")
+    assert tracking.is_dirty() is True
+
+
+def test_passing_workspace_run_promotes_champion(monkeypatch):
+    monkeypatch.delenv("DVC_EXP_NAME", raising=False)
+    assert tracking.promotes_champion(passed=True) is True
+
+
+def test_sweep_variant_never_promotes_champion(monkeypatch):
+    """The regression: every passing sweep variant took the alias in turn.
+
+    The gate measures quantization damage, not quality, so passing it cannot
+    decide what ships. On the first clean sweep that left @champion on stft
+    (val_f1 0.8888) instead of the committed logmel default (0.9931).
+    """
+    monkeypatch.setenv("DVC_EXP_NAME", "mirky-pony")
+    assert tracking.promotes_champion(passed=True) is False
+
+
+def test_failed_gate_never_promotes_champion(monkeypatch):
+    monkeypatch.delenv("DVC_EXP_NAME", raising=False)
+    assert tracking.promotes_champion(passed=False) is False

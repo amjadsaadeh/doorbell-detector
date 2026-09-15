@@ -1,7 +1,4 @@
-import hashlib
-import json
 import os
-import subprocess
 
 import matplotlib.pyplot as plt
 import mlflow
@@ -13,18 +10,15 @@ from sklearn.metrics import ConfusionMatrixDisplay, classification_report
 
 from dataset import load_dataset
 from oof import DECISION_THRESHOLD, OutOfFoldPredictions
-from paths import DATA_FILE, DATA_QUALITY_DIR, MODEL_DIR
+from paths import DATA_QUALITY_DIR, MODEL_DIR
 from splits import aggregate_fold_metrics, iter_folds
+from tracking import (
+    MLFLOW_EXPERIMENT_NAME,
+    run_name,
+    run_tags,
+    write_run_handoff,
+)
 
-MLFLOW_EXPERIMENT_NAME = "doorbell-detector"
-# (json file, metric prefix) pairs produced by extract_data_quality.py (raw,
-# pre-chunking annotations) and draw_data.py (post-chunking/balancing) —
-# logged to MLflow so quality of the data feeding a run is tied to its
-# model/loss metrics.
-DATA_QUALITY_METRIC_FILES = [
-    ("sample_based_quality.json", "dq_raw"),
-    ("chunk_balanced_quality.json", "dq_balanced"),
-]
 DATA_QUALITY_ARTIFACT_FILES = [
     "sample_based_quality.json",
     "chunk_balanced_quality.json",
@@ -34,18 +28,16 @@ DATA_QUALITY_ARTIFACT_FILES = [
 
 
 def log_data_quality():
-    for filename, prefix in DATA_QUALITY_METRIC_FILES:
-        path = DATA_QUALITY_DIR / filename
-        with open(path) as f:
-            metrics = json.load(f)
-        mlflow.log_metrics(
-            {
-                f"{prefix}_{key}": value
-                for key, value in metrics.items()
-                if value is not None
-            }
-        )
+    """Attach the data-quality reports to the run, as artifacts only.
 
+    These used to also be flattened into eight `dq_raw_*`/`dq_balanced_*`
+    metrics. They describe the *dataset*, not the model: for a given
+    dataset_md5 every run reports identical values, so they could never
+    explain a difference between two runs -- while permanently occupying
+    eight columns of the comparison table, which is scarce space. The same
+    numbers are in the JSON files logged just below, and the dataset a run
+    used is now a tag you can group by, so nothing was lost by dropping them.
+    """
     for filename in DATA_QUALITY_ARTIFACT_FILES:
         mlflow.log_artifact(DATA_QUALITY_DIR / filename, artifact_path="data_quality")
 
@@ -61,13 +53,6 @@ def compute_metrics(y_true, y_pred, prefix):
         # the two disagree in MLflow (see EpochLogger in train_cnn.py).
         f"{prefix}_accuracy": report["accuracy"],
     }
-
-
-def get_git_branch():
-    result = subprocess.run(
-        ["git", "rev-parse", "--abbrev-ref", "HEAD"], capture_output=True, text=True
-    )
-    return result.stdout.strip() or "unknown"
 
 
 def main():
@@ -91,15 +76,16 @@ def main():
     # fold 0 below, and the model is saved explicitly too.
     mlflow.xgboost.autolog(disable=True)
 
-    git_branch = get_git_branch()
-
-    with mlflow.start_run(run_name=f"xgboost-{feature_type}-{git_branch}"):
-        mlflow.set_tag("git_branch", git_branch)
-        mlflow.log_param("feature_type", feature_type)
-        # Data lineage: md5 of the training dataset matches the entry DVC
-        # records for it in dvc.lock/its cache, so any MLflow run can be
-        # traced back to the exact dataset version and restored via dvc.
-        mlflow.log_param("balanced_data_md5", hashlib.md5(DATA_FILE.read_bytes()).hexdigest())
+    # Tags, not params: the UI groups and filters by tag only, and
+    # feature_type/head/dataset_md5 are exactly the axes you compare runs
+    # along. dataset_md5 doubles as lineage -- it matches the digest DVC
+    # records in dvc.lock, so a run traces back to a `dvc pull`-able dataset.
+    with mlflow.start_run(
+        run_name=run_name("xgboost", feature_type),
+        tags=run_tags("xgboost", feature_type, stage="train"),
+    ) as run:
+        # Handed to evaluate_quantized so its run nests under this one.
+        write_run_handoff(run.info.run_id)
         mlflow.log_param("n_chunks", X.shape[0])
         mlflow.log_param("n_features", X.shape[1])
         mlflow.log_param("test_size", training["test_size"])
@@ -144,8 +130,15 @@ def main():
 
             fold_val = compute_metrics(y_test, y_pred, "val")
             fold_train = compute_metrics(y_train, y_train_pred, "train")
+            # step=fold, not a fold{i}_ key prefix. Prefixing minted a fresh
+            # metric name per fold -- 40 of them at five folds -- and every
+            # one became a permanent column in the cross-run comparison
+            # table, to hold a number that only means anything within its own
+            # run. As steps they are the same eight series, plotted per fold
+            # inside the run and invisible to compare.
             mlflow.log_metrics(
-                {f"fold{fold}_{k}": v for k, v in {**fold_val, **fold_train}.items()}
+                {f"byfold_{k}": v for k, v in {**fold_val, **fold_train}.items()},
+                step=fold,
             )
             val_per_fold.append(fold_val)
             train_per_fold.append(fold_train)

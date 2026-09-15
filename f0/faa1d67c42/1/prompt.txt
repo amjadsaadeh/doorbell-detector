@@ -1,0 +1,84 @@
+Currently the data within my mlflow instance is cluttered and quite hard to interpret for me. How do I improve this, expecially when it comes to compare my different model runs?
+
+---
+
+yes
+
+---
+
+yes apply
+
+---
+
+well, may it be possible to delete everything in the project and rerun the current state for comparison?
+
+---
+
+<task-notification>
+<task-id>bxfbzg7tv</task-id>
+<summary>Monitor event: "sweep variant progress, gate verdicts and failures"</summary>
+<event>2026-09-15 14:23:16.268897: E external/local_xla/xla/stream_executor/cuda/cuda_driver.cc:152] failed call to cuInit: INTERNAL: CUDA error: Failed call to cuInit: UNKNOWN ERROR (303)</event>
+If this event is something the user would act on now, send a PushNotification. Routine or benign output doesn't need one.
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>bxfbzg7tv</task-id>
+<summary>Monitor event: "sweep variant progress, gate verdicts and failures"</summary>
+<event>val_f1 across 5 folds: 0.9931 +/- 0.0095 (worst 0.9742)</event>
+If this event is something the user would act on now, send a PushNotification. Routine or benign output doesn't need one.
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>bxfbzg7tv</task-id>
+<summary>Monitor event: "sweep variant progress, gate verdicts and failures"</summary>
+<event>2026-09-15 14:47:53.371679: E external/local_xla/xla/stream_executor/cuda/cuda_driver.cc:152] failed call to cuInit: INTERNAL: CUDA error: Failed call to cuInit: UNKNOWN ERROR (303)</event>
+If this event is something the user would act on now, send a PushNotification. Routine or benign output doesn't need one.
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>bt866kh4t</task-id>
+<summary>Monitor event: "sweep variant progress, gate verdicts and real failures"</summary>
+<event>int8  F1      : 0.9977  (drop -0.0006, limit 0.0100)
+gate          : PASSED
+registered    : v1 (champion)</event>
+If this event is something the user would act on now, send a PushNotification. Routine or benign output doesn't need one.
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>bt866kh4t</task-id>
+<summary>Monitor event: "sweep variant progress, gate verdicts and real failures"</summary>
+<event>val_f1 across 5 folds: 0.9901 +/- 0.0109 (worst 0.9702)</event>
+If this event is something the user would act on now, send a PushNotification. Routine or benign output doesn't need one.
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>bt866kh4t</task-id>
+<summary>Monitor event: "sweep variant progress, gate verdicts and real failures"</summary>
+<event>int8 model 26.3 KB -&gt; models/export/doorbell_int8.tflite</event>
+If this event is something the user would act on now, send a PushNotification. Routine or benign output doesn't need one.
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>bt866kh4t</task-id>
+<summary>Monitor event: "sweep variant progress, gate verdicts and real failures"</summary>
+<event>int8  F1      : 0.9944  (drop +0.0011, limit 0.0100)
+gate          : PASSED
+registered    : v2 (champion)</event>
+If this event is something the user would act on now, send a PushNotification. Routine or benign output doesn't need one.
+</task-notification>
+
+---
+
+Is there a method to keep the agents right n ow running? I would like to disconnect, but I am afraid the subagents are terminated either

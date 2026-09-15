@@ -3,7 +3,7 @@
   "checkpoint_id": "f0faa1d67c42",
   "strategy": "manual-commit",
   "branch": "mlflow-run-organization",
-  "checkpoints_count": 7,
+  "checkpoints_count": 16,
   "files_touched": [
     "dvc.lock"
   ],
@@ -14,13 +14,20 @@
       "compact_transcript": "/f0/faa1d67c42/0/transcript.jsonl",
       "content_hash": "/f0/faa1d67c42/0/content_hash.txt",
       "prompt": "/f0/faa1d67c42/0/prompt.txt"
+    },
+    {
+      "metadata": "/f0/faa1d67c42/1/metadata.json",
+      "transcript": "/f0/faa1d67c42/1/full.jsonl",
+      "compact_transcript": "/f0/faa1d67c42/1/transcript.jsonl",
+      "content_hash": "/f0/faa1d67c42/1/content_hash.txt",
+      "prompt": "/f0/faa1d67c42/1/prompt.txt"
     }
   ],
   "token_usage": {
-    "input_tokens": 607,
-    "cache_creation_tokens": 385052,
-    "cache_read_tokens": 17142432,
-    "output_tokens": 113649,
-    "api_call_count": 118
+    "input_tokens": 796,
+    "cache_creation_tokens": 551818,
+    "cache_read_tokens": 29380371,
+    "output_tokens": 196431,
+    "api_call_count": 213
   }
 }

@@ -7,3 +7,7 @@ yes
 ---
 
 yes apply
+
+---
+
+well, may it be possible to delete everything in the project and rerun the current state for comparison?

@@ -36,15 +36,21 @@ from tensorflow import keras
 from paths import (
     CALIBRATION_CHUNKS,
     CALIBRATION_MANIFEST,
-    DATA_FILE,
     QUANTIZED_METRICS,
 )
 from provenance import chunk_provenance
 from quantize_model import NORMALIZATION_PATH, TFLITE_PATH
 from tflite_utils import build_export_model, largest_activation_bytes, tflite_predict
 from dataset import load_dataset
+from tracking import (
+    MLFLOW_EXPERIMENT_NAME,
+    read_run_handoff,
+    register_int8_model,
+    run_name,
+    run_tags,
+)
 from train_cnn import MODEL_PATH
-from train_xgboost import MLFLOW_EXPERIMENT_NAME, compute_metrics, get_git_branch
+from train_xgboost import compute_metrics
 
 WORST_DEVIATIONS_LOGGED = 20
 ON_FAILURE_MODES = ("fail", "warn")
@@ -202,7 +208,18 @@ def main():
 
     mlflow.set_tracking_uri(os.environ["MLFLOW_TRACKING_URI"])
     mlflow.set_experiment(MLFLOW_EXPERIMENT_NAME)
-    git_branch = get_git_branch()
+    # The training run that produced the model being scored here, so this run
+    # becomes its child rather than an unrelated sibling in a flat list. None
+    # when the model predates the handoff file, in which case this logs a
+    # top-level run exactly as it used to.
+    parent_run_id = read_run_handoff()
+
+    tags = {
+        **run_tags(head, feature_type, stage="quantized"),
+        # So nobody mistakes these f1 numbers for a generalization estimate.
+        "metric_scope": "in-sample float-vs-int8 delta",
+        "gate": "passed" if passed else "failed",
+    }
 
     with tempfile.TemporaryDirectory() as tmp_dir:
         diagnostics = write_diagnostics(table, Path(tmp_dir))
@@ -211,17 +228,11 @@ def main():
         # mlflow's context manager derives the status from the exception. So
         # a gate breach leaves a permanent, findable record instead of only a
         # dead pipeline.
-        with mlflow.start_run(run_name=f"{head}-{feature_type}-{git_branch}-quantized"):
-            mlflow.set_tag("git_branch", git_branch)
-            mlflow.set_tag("stage", "quantized")
-            # So nobody mistakes these f1 numbers for a generalization estimate.
-            mlflow.set_tag("metric_scope", "in-sample float-vs-int8 delta")
-            mlflow.set_tag("gate", "passed" if passed else "failed")
-            mlflow.log_param("feature_type", feature_type)
-            mlflow.log_param("head", head)
-            mlflow.log_param(
-                "balanced_data_md5", hashlib.md5(DATA_FILE.read_bytes()).hexdigest()
-            )
+        with mlflow.start_run(
+            run_name=run_name(head, feature_type, suffix="-int8"),
+            parent_run_id=parent_run_id,
+            tags=tags,
+        ) as run:
             mlflow.log_param("input_shape", str(X.shape[1:]))
             mlflow.log_params(quantization)
             # The calibration subset is part of the quantized model's identity:
@@ -239,6 +250,19 @@ def main():
             mlflow.log_artifact(TFLITE_PATH)
             mlflow.log_artifact(QUANTIZED_METRICS)
             mlflow.log_metrics(metrics)
+
+            # Register the graph that actually gets flashed. Without this,
+            # "which run produced the .tflite on the device?" is answered by
+            # hand-matching md5s across runs; with it, the `champion` alias
+            # points at exactly one version and carries its run with it.
+            # Failed versions are registered too but never aliased, so the
+            # alias can only ever name a model the gate approved.
+            version = register_int8_model(
+                run_id=run.info.run_id,
+                artifact_uri=f"{run.info.artifact_uri}/{TFLITE_PATH.name}",
+                passed=passed,
+                tags=tags,
+            )
 
             print(f"scored chunks : {metrics['scored_chunks']} (in-sample)")
             print(f"float F1      : {metrics['float_insample_f1_score']:.4f}")
@@ -258,6 +282,10 @@ def main():
             print(f"tflite size   : {metrics['tflite_bytes'] / 1024:.1f} KB")
             print(f"peak tensor   : {metrics['peak_activation_bytes'] / 1024:.1f} KB")
             print(f"gate          : {'PASSED' if passed else 'FAILED'}")
+            print(
+                f"registered    : v{version.version}"
+                f"{' (champion)' if passed else ' (not aliased: gate failed)'}"
+            )
 
             if not passed and on_failure == "fail":
                 raise SystemExit(

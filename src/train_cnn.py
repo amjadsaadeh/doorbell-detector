@@ -3,7 +3,7 @@ Small keyword-spotting-style CNN trained on the 2D time-frequency chunks in
 balanced_data.h5 (proposal 1). Feature-representation agnostic like
 train_xgboost.py: it auto-detects the *_features column, so the same script
 trains on MFCC (cnn-mfcc branch) or STFT spectrogram (cnn-spectrogram
-branch) chunks — the runs are named cnn-<feature_type>-<git_branch>.
+branch) chunks — the runs are named cnn-<feature_type>@<commit> (src/tracking.py).
 
 Unlike the XGBoost path the chunks are NOT flattened: the depthwise-
 separable CNN sees the (n_bins, n_frames) structure directly, which is the
@@ -11,7 +11,6 @@ point of this experiment. Split, MLflow logging and dataset lineage mirror
 train_xgboost.py so runs stay comparable across model families.
 """
 
-import hashlib
 import os
 
 import matplotlib.pyplot as plt
@@ -22,14 +21,15 @@ from sklearn.metrics import ConfusionMatrixDisplay
 
 from dataset import load_dataset
 from oof import DECISION_THRESHOLD, OutOfFoldPredictions
-from paths import DATA_FILE, MODEL_DIR
+from paths import MODEL_DIR
 from splits import aggregate_fold_metrics, iter_folds
-from train_xgboost import (
+from tracking import (
     MLFLOW_EXPERIMENT_NAME,
-    compute_metrics,
-    get_git_branch,
-    log_data_quality,
+    run_name,
+    run_tags,
+    write_run_handoff,
 )
+from train_xgboost import compute_metrics, log_data_quality
 
 MODEL_PATH = MODEL_DIR / "cnn_model.keras"
 
@@ -89,12 +89,15 @@ def main():
     mlflow.set_tracking_uri(os.environ["MLFLOW_TRACKING_URI"])
     mlflow.set_experiment(MLFLOW_EXPERIMENT_NAME)
 
-    git_branch = get_git_branch()
-
-    with mlflow.start_run(run_name=f"cnn-{feature_type}-{git_branch}"):
-        mlflow.set_tag("git_branch", git_branch)
-        mlflow.log_param("feature_type", feature_type)
-        mlflow.log_param("balanced_data_md5", hashlib.md5(DATA_FILE.read_bytes()).hexdigest())
+    # See tracking.run_tags: feature_type/head/dataset_md5 are tags rather
+    # than params because the UI can only group and filter by tags, and those
+    # are the axes a variant sweep is compared along.
+    with mlflow.start_run(
+        run_name=run_name("cnn", feature_type),
+        tags=run_tags("cnn", feature_type, stage="train"),
+    ) as run:
+        # Handed to evaluate_quantized so its run nests under this one.
+        write_run_handoff(run.info.run_id)
         mlflow.log_param("n_chunks", X.shape[0])
         mlflow.log_param("input_shape", str(X.shape[1:]))
         mlflow.log_param("test_size", training["test_size"])
@@ -165,8 +168,12 @@ def main():
 
             fold_val = compute_metrics(y_test, y_pred, "val")
             fold_train = compute_metrics(y_train, y_train_pred, "train")
+            # step=fold rather than a fold{i}_ prefix -- see the same call in
+            # train_xgboost.py. Prefixing turned per-fold detail into 40
+            # permanent columns of the cross-run comparison table.
             mlflow.log_metrics(
-                {f"fold{fold}_{k}": v for k, v in {**fold_val, **fold_train}.items()}
+                {f"byfold_{k}": v for k, v in {**fold_val, **fold_train}.items()},
+                step=fold,
             )
             val_per_fold.append(fold_val)
             train_per_fold.append(fold_train)

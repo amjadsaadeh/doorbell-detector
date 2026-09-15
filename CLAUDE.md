@@ -99,10 +99,41 @@ full parameter reference and the per-stage command list.
   to MLflow (experiment `doorbell-detector`) at `MLFLOW_TRACKING_URI` — a self-hosted
   server (`https://mlflow.saadeh.dev`), not managed from this repo. `dvc metrics
   show`/`dvc plots diff` no longer cover training metrics; check the MLflow UI instead.
-  Runs are named `<head>-<feature_type>-<git_branch>` (feature type read from the
-  `feature_type` attribute of `balanced_data.h5`) and log `balanced_data_md5` — the md5
-  DVC records for the dataset — so every run traces to an exact, `dvc pull`-able
-  dataset version.
+- **`src/tracking.py` is the single definition of run identity**, imported by both
+  trainers and `evaluate_quantized`. Runs are named `<head>-<feature_type>@<commit>`
+  (e.g. `cnn-logmel@2cb39e1`, the int8 child `…-int8`), **not** by branch. Branch was
+  the previous naming field and it is the one that breaks: `git rev-parse --abbrev-ref
+  HEAD` returns the literal string `"HEAD"` inside the detached worktree `dvc exp run
+  --temp` uses, so the entire feature/head sweep logged as `cnn-mfcc-HEAD` with no
+  recoverable commit. The commit does not need capturing — MLflow already records it
+  as `mlflow.source.git.commit` on every run. `git_ref` falls back to
+  `detached@<DVC_EXP_BASELINE_REV>`, and `dvc_exp` carries `DVC_EXP_NAME`, which DVC
+  exports into the stage environment.
+- **Tags carry the comparison axes, params carry the settings.** The MLflow UI can
+  group and filter by tag but not by param, so `feature_type`, `head`, `stage`
+  (`train`/`quantized`) and `dataset_md5` are tags. `dataset_md5` is the md5 DVC
+  records for `balanced_data.h5`, so a run traces to an exact `dvc pull`-able dataset —
+  and because both stages now tag it, a model and its int8 counterpart can be joined.
+  A `+dirty` suffix on the run name marks a run whose tracked source did not match its
+  commit; `dvc.lock` is excluded from that check, since the `dvc repro` running the
+  stage rewrites it and would otherwise mark every run dirty.
+- **Per-fold metrics are steps, not key prefixes.** `mlflow.log_metrics(…, step=fold)`
+  under `byfold_*`. The old `fold{i}_<metric>` prefix minted a new metric key per fold —
+  40 of them at five folds — and each became a permanent column in the cross-run
+  comparison table, to hold a number only meaningful inside its own run. Likewise the
+  eight `dq_raw_*`/`dq_balanced_*` metrics were dropped: they describe the *dataset*, are
+  identical for a given `dataset_md5`, and the same JSON is already logged as an
+  artifact by the same function. Net effect ~80 metric keys per run → ~40, of which ~15
+  are the summary axis you actually rank variants on.
+- **The quantized run is a child of the training run.** `train_model` writes its run id
+  to `models/trained/mlflow_run.json` — inside an existing DVC output of that stage and
+  a dependency of both downstream stages, so the handoff travels the dependency graph
+  and needed no `dvc.yaml` change. `evaluate_quantized` reads it and passes
+  `parent_run_id`. A missing file is not an error: the run logs top-level, as before.
+- **The int8 graph is registered** as `doorbell-detector-int8`, aliased `@champion`
+  only when the gate passes. This is what makes "which run produced the `.tflite` on
+  the device" a lookup rather than an md5 hunt. Gate-failed versions are still
+  registered and inspectable, they just never receive the alias.
 - **Label Studio auth** is a JWT personal access token: `fetch_data.sh` exchanges it
   via `/api/token/refresh` for a Bearer token (legacy `Token` header returns 401).
 - **Incrementality:** `data/audio` is a `persist: true` output — unchanged labels skip
@@ -262,6 +293,7 @@ matching, GPIO button trigger, Prometheus metrics/health endpoint.
 | `src/train_model.py` | Head dispatcher (`training.head`) + feature/head compatibility check |
 | `src/train_cnn.py` | Small keyword-spotting CNN, MLflow tracking |
 | `src/train_xgboost.py` | XGBoost head, MLflow tracking, shared metric/quality helpers |
+| `src/tracking.py` | Run identity: naming, the tag vocabulary, train→quantize handoff, registry |
 | `src/splits.py` | Group-aware CV folds + fold-metric aggregation, shared by both heads |
 | `src/oof.py` | Held-out per-chunk predictions collected across the CV folds |
 | `src/provenance.py` | Where a chunk came from: the manifest join every per-chunk diagnostic uses |

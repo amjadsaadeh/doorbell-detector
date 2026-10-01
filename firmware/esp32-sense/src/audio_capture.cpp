@@ -80,6 +80,7 @@ void begin_recording() {
   g_clip_target_len =
       g_clip_len + static_cast<size_t>(kPostTriggerSeconds * kBytesPerSecond);
   g_state = State::kRecording;
+  Serial.printf("record: started %s\n", g_clip_final_path.c_str());
 }
 
 void finish_recording() {
@@ -89,6 +90,7 @@ void finish_recording() {
   // other holder is the daily upload pass, which always releases it in
   // bounded time, and dropping a just-captured clip because an upload was
   // mid-transfer would be worse than a few extra seconds of write latency.
+  bool saved = false;
   if (sd_storage::lock()) {
     File f = SD.open(tmp_path.c_str(), FILE_WRITE);
     if (f) {
@@ -97,10 +99,12 @@ void finish_recording() {
       f.write(header.data(), header.size());
       f.write(g_clip_buf, g_clip_len);
       f.close();
-      sd_storage::commit_temp_file(g_clip_final_path);
+      saved = sd_storage::commit_temp_file(g_clip_final_path);
     }
     sd_storage::unlock();
   }
+  Serial.printf("record: %s %s (%u bytes)\n", saved ? "saved" : "FAILED to save",
+                g_clip_final_path.c_str(), static_cast<unsigned>(g_clip_len));
 
   g_state = State::kIdle;
 }

@@ -35,6 +35,16 @@ cp .env.esp32.example .env.esp32
 # values across, don't invent new credentials.
 ```
 
+Two values have a format the firmware is strict about:
+
+- `ESP32_MINIO_BUCKET` is the bucket, optionally followed by a key prefix:
+  `doorbell-detector/raw` puts clips in bucket `doorbell-detector` under
+  `raw/esp32-recordings/<ESP32_DEVICE_ID>/`. `ESP32_MINIO_ENDPOINT` is
+  `host:port` with no scheme — it is signed verbatim as the `Host` header.
+- `ESP32_TZ` must be a POSIX TZ string (`CET-1CEST,M3.5.0,M10.5.0/3` for
+  Germany), not an IANA name like `Europe/Berlin`, which newlib silently treats
+  as UTC. The boot log's `tz:` line warns when the value has no offset.
+
 `.env.esp32` is git-ignored; nothing in it is ever committed. `build.sh`
 sources it and forwards every value into `platformio.ini`'s `${sysenv.*}`
 build flags, so credentials are baked into the compiled binary rather than
@@ -48,9 +58,31 @@ typed on the device or left in source.
 ./build.sh device monitor        # serial monitor (115200 baud)
 ```
 
-Expected serial output on a healthy boot: SD card mount, PSRAM ring-buffer
-allocation, I2S/PDM mic init, WiFi connect, MQTT connect + subscribe, then
-NTP sync once WiFi is up.
+Uploads run at 115200 baud without esptool's stub loader (`platformio.ini`):
+through usbipd on WSL2 the stub stops answering after its baud switch. From
+WSL, attach the board first with `usbipd attach --wsl --busid <id>` from
+Windows; the port is `/dev/ttyACM0`.
+
+A healthy boot logs:
+
+```
+tz: "CET-1CEST,M3.5.0,M10.5.0/3"
+Doorbell recorder ready.
+wifi: connected, ip 192.168.178.167
+ntp: synced, local time 2026-10-01 11:39:43
+upload: pass started, 0 file(s)
+mqtt: connected, subscribe doorbell/trigger ok
+```
+
+then `mqtt: trigger …`, `record: started …` and `record: saved …` per trigger,
+and one `upload: <key> -> HTTP <status>` line per file. A failed upload prints
+MinIO's error body when it gets one; `-3 send payload failed` with "Connection
+reset by peer" means MinIO rejected the request from its headers alone (e.g.
+`SignatureDoesNotMatch`) — `mc admin trace --errors <alias>` shows the reason.
+
+Opening the serial port resets the chip (USB-Serial-JTAG), so a monitor always
+starts from a fresh boot. The pass at boot uploads whatever is on the card,
+which makes a reset the quickest way to test uploading.
 
 ## Running the unit tests (no hardware needed)
 
@@ -72,11 +104,10 @@ Once flashed, to confirm the two behaviors actually work:
    doorbell/trigger -m x`) and confirm a new
    `/recordings/doorbell_manual_*.wav` appears on the SD card, playable and
    ~`kPreTriggerSeconds + kPostTriggerSeconds` long (9s with the defaults).
-2. Either wait for the configured upload hour, or temporarily set
-   `kUploadHour` in `include/config.h` to the current hour and reflash, and
-   confirm the file disappears from the SD card and a corresponding object
-   appears in the MinIO bucket at
-   `esp32-recordings/<ESP32_DEVICE_ID>/<filename>.wav`.
+2. Reset the board (or wait for the configured upload hour) — the upload
+   pass at boot sends everything on the card. Confirm the log shows
+   `HTTP 200` and the object appears in MinIO at
+   `<ESP32_MINIO_BUCKET>/esp32-recordings/<ESP32_DEVICE_ID>/<filename>.wav`.
 
 ## Layout
 

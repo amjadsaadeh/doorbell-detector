@@ -1,0 +1,82 @@
+check the state of the esp32 implementation. whats already done?
+
+---
+
+inspect the env: what do I need to install here to compile this? What do I need to install for flashing?
+
+---
+
+ok do it
+
+---
+
+I attached the device and did the usermod. proceed
+
+---
+
+well do it yourself
+
+---
+
+filled it in, go
+
+---
+
+reattach the esp32, reflash it and check if it works
+
+---
+
+I reformatted in ext32, it's 16gb big, did foramtting on windows
+
+---
+
+I reformatted with mbr the sdcard. reattach the esp32, reflash it and verify if it's runing.
+
+---
+
+I triggered a recording, check esp32 logs
+
+---
+
+Ok, I checked mqtt broker port. it's not the tls port. Also minio is plain http. MQTT log: 2026-10-01 09:38:31: Client esp32-sense-xiao-sense-01 [192.168.178.167:64570] disconnected: session taken over.
+2026-10-01 09:38:31: New client connected from 192.168.178.167:57068 as esp32-sense-xiao-sense-01 (p4, c1, k15, u'mic').
+
+---
+
+trace is running retry
+
+---
+
+<pasted_content id="1b68">
+<Error><Code>SignatureDoesNotMatch</Code><Message>The request signature we calculated does not match the signature you provided. Check your key and signing method.</Message><Key>esp32-recordings/xiao-sense-01/doorbell_manual_20261001_074638.wav</Key><BucketName>doorbell-detector%2Fraw</BucketName><Resource>/doorbell-detector/raw/esp32-recordings/xiao-sense-01/doorbell_manual_20261001_074638.wav</Resource><RequestId>18DA5E4AB4451B89</RequestId><HostId>dd9025bab4ad464b049177c95eb6ebf374d3b3fd1af9251148b658df7ac2e3e8</HostId></Error>
+192.168.178.126:9000
+192.168.178.126:9000 [REQUEST s3.PutObject] [2026-10-01T11:37:57.320] [Client IP: 192.168.178.167]
+192.168.178.126:9000 PUT /doorbell-detector%2Fraw/esp32-recordings/xiao-sense-01/doorbell_manual_20261001_074845.wav
+192.168.178.126:9000 Proto: HTTP/1.1
+192.168.178.126:9000 Host: 192.168.178.126:9000
+192.168.178.126:9000 X-Amz-Content-Sha256: UNSIGNED-PAYLOAD
+192.168.178.126:9000 X-Amz-Date: 20261001T093811Z
+192.168.178.126:9000 Accept-Encoding: identity;q=1,chunked;q=0.1,*;q=0
+192.168.178.126:9000 Authorization: AWS4-HMAC-SHA256 Credential=mic/20261001/us-east-1/s3/aws4_request, SignedHeaders=host;x-amz-content-sha256;x-amz-date, Signature=b446ff54a4d7bafd5a4fa2dd59a6a931aa40ffbc81e169b813b5a265cd188624
+192.168.178.126:9000 Connection: keep-alive
+192.168.178.126:9000 Content-Length: 288044
+192.168.178.126:9000 User-Agent: ESP32HTTPClient
+192.168.178.126:9000 <BLOB>
+192.168.178.126:9000 [RESPONSE] [2026-10-01T11:37:57.320] [ Duration 227µs TTFB 211.104µs ↑ 104 B  ↓ 575 B ]
+192.168.178.126:9000 403 Forbidden
+192.168.178.126:9000 Server: MinIO
+192.168.178.126:9000 Strict-Transport-Security: max-age=31536000; includeSubDomains
+192.168.178.126:9000 X-Amz-Id-2: dd9025bab4ad464b049177c95eb6ebf374d3b3fd1af9251148b658df7ac2e3e8
+192.168.178.126:9000 X-Amz-Request-Id: 18DA5E4AD495CA8B
+192.168.178.126:9000 X-Ratelimit-Remaining: 289
+192.168.178.126:9000 Content-Length: 575
+192.168.178.126:9000 Content-Type: application/xml
+192.168.178.126:9000 Vary: Origin,Accept-Encoding
+192.168.178.126:9000 X-Content-Type-Options: nosniff
+192.168.178.126:9000 X-Ratelimit-Limit: 289
+192.168.178.126:9000 X-Xss-Protection: 1; mode=block
+192.168.178.126:9000 Accept-Ranges: bytes
+192.168.178.126:9000 <?xml version="1.0" encoding="UTF-8"?>
+<Error><Code>SignatureDoesNotMatch</Code><Message>The request signature we calculated does not match the signature you provided. Check your key and signing method.</Message><Key>esp32-recordings/xiao-sense-01/doorbell_manual_20261001_074845.wav</Key><BucketName>doorbell-detector%2Fraw</BucketName><Resource>/doorbell-detector/raw/esp32-recordings/xiao-sense-01/doorbell_manual_20261001_074845.wav</Resource><RequestId>18DA5E4AD495CA8B</RequestId><HostId>dd9025bab4ad464b049177c95eb6ebf374d3b3fd1af9251148b658df7ac2e3e8</HostId></Error>
+192.168.178.126:9000
+</pasted_content id="1b68">

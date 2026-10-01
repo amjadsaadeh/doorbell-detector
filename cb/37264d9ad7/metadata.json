@@ -1,0 +1,30 @@
+{
+  "cli_version": "0.11.3",
+  "checkpoint_id": "cb37264d9ad7",
+  "strategy": "manual-commit",
+  "branch": "esp32-upload-fixes",
+  "checkpoints_count": 4,
+  "files_touched": [
+    "firmware/esp32-sense/src/audio_capture.cpp",
+    "firmware/esp32-sense/src/main.cpp",
+    "firmware/esp32-sense/src/mqtt_client.cpp",
+    "firmware/esp32-sense/src/s3_uploader.cpp",
+    "firmware/esp32-sense/src/upload_scheduler.cpp"
+  ],
+  "sessions": [
+    {
+      "metadata": "/cb/37264d9ad7/0/metadata.json",
+      "transcript": "/cb/37264d9ad7/0/full.jsonl",
+      "compact_transcript": "/cb/37264d9ad7/0/transcript.jsonl",
+      "content_hash": "/cb/37264d9ad7/0/content_hash.txt",
+      "prompt": "/cb/37264d9ad7/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 124,
+    "cache_creation_tokens": 343540,
+    "cache_read_tokens": 5374444,
+    "output_tokens": 42544,
+    "api_call_count": 62
+  }
+}

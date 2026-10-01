@@ -20,9 +20,8 @@ uint32_t g_last_reconnect_attempt_ms = 0;
 constexpr uint32_t kReconnectIntervalMs = 5000;
 
 void on_message(char *topic, uint8_t *payload, unsigned int length) {
-  (void)topic;
   (void)payload;
-  (void)length;
+  Serial.printf("mqtt: trigger on %s (%u bytes)\n", topic, length);
   // Any message on the trigger topic fires a recording — matches
   // data_collection/data_collector.py's default (no mqtt_trigger_value set).
   audio_capture::request_recording();
@@ -40,7 +39,11 @@ bool connect() {
   }
 
   if (ok) {
-    g_client.subscribe(MQTT_TRIGGER_TOPIC);
+    const bool subscribed = g_client.subscribe(MQTT_TRIGGER_TOPIC);
+    Serial.printf("mqtt: connected, subscribe %s %s\n", MQTT_TRIGGER_TOPIC,
+                  subscribed ? "ok" : "FAILED");
+  } else {
+    Serial.printf("mqtt: connect failed, state %d\n", g_client.state());
   }
   return ok;
 }

@@ -59,13 +59,17 @@ void utc_amz_date(std::string &amz_date_out, std::string &date_stamp_out) {
 bool upload_file(const std::string &local_path) {
   File f = SD.open(local_path.c_str(), FILE_READ);
   if (!f) {
+    Serial.printf("upload: cannot open %s\n", local_path.c_str());
     return false;
   }
   const size_t file_size = f.size();
 
   const std::string key = std::string(kS3KeyPrefix) + "/" + DEVICE_ID + "/" +
                            basename_of(local_path);
-  const std::string canonical_uri = "/" + uri_encode(MINIO_BUCKET, false) +
+  // MINIO_BUCKET may carry a key prefix ("doorbell-detector/raw"), so its
+  // '/' must stay a path separator: encoded as %2F, MinIO decodes it before
+  // signing and the signature never matches.
+  const std::string canonical_uri = "/" + uri_encode(MINIO_BUCKET, true) +
                                      "/" + uri_encode(key, true);
 
   std::string amz_date, date_stamp;
@@ -105,6 +109,15 @@ bool upload_file(const std::string &local_path) {
   http.addHeader("Authorization", authorization.c_str());
 
   int status = http.sendRequest("PUT", &f, file_size);
+  if (status >= 200 && status < 300) {
+    Serial.printf("upload: %s -> HTTP %d\n", key.c_str(), status);
+  } else if (status > 0) {
+    Serial.printf("upload: %s -> HTTP %d: %s\n", key.c_str(), status,
+                  http.getString().c_str());
+  } else {
+    Serial.printf("upload: %s -> failed (%d %s)\n", key.c_str(), status,
+                  HTTPClient::errorToString(status).c_str());
+  }
   http.end();
   f.close();
 

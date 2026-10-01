@@ -1,2 +1,3 @@
 .env.esp32
 .pio/
+*.swp

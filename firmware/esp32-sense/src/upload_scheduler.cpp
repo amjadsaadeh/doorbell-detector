@@ -1,5 +1,7 @@
 #include "upload_scheduler.h"
 
+#include <Arduino.h>
+
 #include "config.h"
 #include "ntp_time.h"
 #include "s3_uploader.h"
@@ -24,7 +26,10 @@ void run_upload_pass() {
     return;
   }
 
-  for (const auto &path : sd_storage::list_recordings()) {
+  const auto recordings = sd_storage::list_recordings();
+  Serial.printf("upload: pass started, %u file(s)\n",
+                static_cast<unsigned>(recordings.size()));
+  for (const auto &path : recordings) {
     if (s3_uploader::upload_file(path)) {
       sd_storage::remove_file(path);
     }

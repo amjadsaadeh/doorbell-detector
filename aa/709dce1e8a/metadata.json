@@ -1,0 +1,39 @@
+{
+  "cli_version": "0.11.3",
+  "checkpoint_id": "aa709dce1e8a",
+  "strategy": "manual-commit",
+  "branch": "esp32-upload-fixes",
+  "checkpoints_count": 12,
+  "files_touched": [
+    "firmware/esp32-sense/README.md",
+    "firmware/esp32-sense/build.sh",
+    "firmware/esp32-sense/include/config.h",
+    "firmware/esp32-sense/include/mqtt_client.h",
+    "firmware/esp32-sense/include/ota.h",
+    "firmware/esp32-sense/include/s3_request.h",
+    "firmware/esp32-sense/ota.sh",
+    "firmware/esp32-sense/platformio.ini",
+    "firmware/esp32-sense/src/main.cpp",
+    "firmware/esp32-sense/src/mqtt_client.cpp",
+    "firmware/esp32-sense/src/ota.cpp",
+    "firmware/esp32-sense/src/s3_request.cpp",
+    "firmware/esp32-sense/src/s3_uploader.cpp",
+    "firmware/esp32-sense/tools/ota_publish.py"
+  ],
+  "sessions": [
+    {
+      "metadata": "/aa/709dce1e8a/0/metadata.json",
+      "transcript": "/aa/709dce1e8a/0/full.jsonl",
+      "compact_transcript": "/aa/709dce1e8a/0/transcript.jsonl",
+      "content_hash": "/aa/709dce1e8a/0/content_hash.txt",
+      "prompt": "/aa/709dce1e8a/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 178,
+    "cache_creation_tokens": 318850,
+    "cache_read_tokens": 8378636,
+    "output_tokens": 57610,
+    "api_call_count": 85
+  }
+}

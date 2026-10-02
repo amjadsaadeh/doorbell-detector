@@ -1,0 +1,28 @@
+{
+  "cli_version": "0.11.3",
+  "checkpoint_id": "24dac6b8447a",
+  "strategy": "manual-commit",
+  "branch": "esp32-upload-fixes",
+  "checkpoints_count": 12,
+  "files_touched": [
+    "firmware/esp32-sense/include/ntp_time.h",
+    "firmware/esp32-sense/src/main.cpp",
+    "firmware/esp32-sense/src/ntp_time.cpp"
+  ],
+  "sessions": [
+    {
+      "metadata": "/24/dac6b8447a/0/metadata.json",
+      "transcript": "/24/dac6b8447a/0/full.jsonl",
+      "compact_transcript": "/24/dac6b8447a/0/transcript.jsonl",
+      "content_hash": "/24/dac6b8447a/0/content_hash.txt",
+      "prompt": "/24/dac6b8447a/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 174,
+    "cache_creation_tokens": 316677,
+    "cache_read_tokens": 8060507,
+    "output_tokens": 56979,
+    "api_call_count": 83
+  }
+}

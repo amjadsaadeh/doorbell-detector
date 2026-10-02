@@ -57,3 +57,15 @@ constexpr uint32_t kNtpResyncIntervalMs = 6UL * 60 * 60 * 1000; // 6 hours
 // --- S3 / MinIO --------------------------------------------------------------
 constexpr const char *kS3Service = "s3";
 constexpr const char *kS3KeyPrefix = "esp32-recordings";
+
+// --- OTA ---------------------------------------------------------------------
+// Device topics are "<prefix><DEVICE_ID>/ota" (update requests, payload
+// "<version> <md5hex>") and "<prefix><DEVICE_ID>/status" (retained state).
+constexpr const char *kMqttDeviceTopicPrefix = "doorbell/";
+// A freshly OTA'd image that hasn't reached the MQTT broker within this long
+// is marked invalid and the bootloader falls back to the previous one.
+constexpr uint32_t kOtaConfirmTimeoutMs = 5 * 60 * 1000;
+// Images are fetched from "<prefix>/<DEVICE_ID>/<version>.bin"; the prefix is
+// ESP32_MINIO_FIRMWARE_PREFIX, or this when that is unset. Kept outside
+// raw/, which is Label Studio's source storage.
+constexpr const char *kDefaultFirmwarePrefix = "doorbell-detector/firmware";

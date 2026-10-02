@@ -14,7 +14,7 @@ deliberately limited to recording, not detection:
    build time, then deletes each file that uploaded successfully.
 
 No cross-correlation detection, no on-device ML, no camera, no GPIO button,
-no OTA, no TLS (matches the existing LAN-only MQTT/MinIO deployment) — see the
+no TLS (matches the existing LAN-only MQTT/MinIO deployment) — see the
 project plan this was built from for the full rationale.
 
 ## Prerequisites
@@ -41,6 +41,9 @@ Two values have a format the firmware is strict about:
   `doorbell-detector/raw` puts clips in bucket `doorbell-detector` under
   `raw/esp32-recordings/<ESP32_DEVICE_ID>/`. `ESP32_MINIO_ENDPOINT` is
   `host:port` with no scheme — it is signed verbatim as the `Host` header.
+- `ESP32_MINIO_FIRMWARE_PREFIX` (optional, default
+  `doorbell-detector/firmware`) is where OTA images live — deliberately not
+  under `raw/`, which is Label Studio's source storage.
 - `ESP32_TZ` must be a POSIX TZ string (`CET-1CEST,M3.5.0,M10.5.0/3` for
   Germany), not an IANA name like `Europe/Berlin`, which newlib silently treats
   as UTC. The boot log's `tz:` line warns when the value has no offset.
@@ -84,6 +87,43 @@ Opening the serial port resets the chip (USB-Serial-JTAG), so a monitor always
 starts from a fresh boot. The pass at boot uploads whatever is on the card,
 which makes a reset the quickest way to test uploading.
 
+## Updating over WiFi (OTA)
+
+```bash
+./ota.sh                  # build HEAD, upload, ask the board to update, wait
+./ota.sh --allow-dirty    # same, from an uncommitted tree
+```
+
+`ota.sh` builds the image, uploads it to
+`<ESP32_MINIO_FIRMWARE_PREFIX>/<ESP32_DEVICE_ID>/<version>.bin` with the
+board's own `.env.esp32` credentials, and publishes `"<version> <md5>"` to
+`doorbell/<ESP32_DEVICE_ID>/ota`. The board downloads it with the same SigV4
+signing it uses for recordings, checks the MD5, and reboots into it. The
+script exits 0 only once the board reports the new version running. The
+version is `git describe --always --dirty`, also printed at boot as `fw: …`.
+
+The board publishes its state, retained, to `doorbell/<ESP32_DEVICE_ID>/status`
+— once it is off USB, that is the only place to see it:
+
+```
+fw=<version> state=running
+fw=<version> state=downloading to=<new>
+fw=<version> state=rebooting to=<new>
+fw=<version> state=failed to=<new> reason=<why>
+fw=<version> state=rolled-back from=<new>
+```
+
+**Rollback.** A new image boots unconfirmed and is only marked valid once it
+reaches the MQTT broker — proof it can receive the next update. If it doesn't
+within 5 minutes (`kOtaConfirmTimeoutMs`), crashes, or hits a fatal init error
+first, the bootloader boots the previous image, which reports
+`state=rolled-back`. An update requested mid-recording waits until the clip is
+saved; a doorbell trigger *during* a download still records, but may drop
+audio while flash is being written.
+
+The first OTA-capable build has to be flashed over USB; images flashed over
+USB are never put on probation.
+
 ## Running the unit tests (no hardware needed)
 
 ```bash
@@ -114,10 +154,13 @@ Once flashed, to confirm the two behaviors actually work:
 ```
 platformio.ini         # board/framework/build_flags; secrets via ${sysenv.*}
 build.sh                # sources .env.esp32, wraps `pio`
+ota.sh                  # build + ship over WiFi (tools/ota_publish.py)
 .env.esp32.example      # template for the git-ignored .env.esp32
 include/config.h        # compile-time constants (pins, buffer sizes, timing)
 src/                    # hardware-dependent modules (audio, SD, WiFi, MQTT,
-                        # NTP, S3 upload, scheduler, main)
+                        # NTP, S3 request signing + upload, OTA,
+                        # scheduler, main)
+tools/ota_publish.py    # host side of OTA: MinIO upload + MQTT request
 lib/sigv4core/          # pure AWS SigV4 request signing — no Arduino
                         # dependency, so it also builds for `env:native`
 test/test_sigv4/        # native unit tests for lib/sigv4core

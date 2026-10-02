@@ -15,4 +15,7 @@ else
   echo "warning: .env.esp32 not found — copy .env.esp32.example and fill it in" >&2
 fi
 
+# The image's version is its commit, so an OTA'd board traces to one.
+export ESP32_FW_VERSION="${ESP32_FW_VERSION:-$(git describe --always --dirty)}"
+
 exec pio "$@"

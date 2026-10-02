@@ -7,6 +7,11 @@
 
 namespace ntp_time {
 
+// Applies TZ_STRING to the C library. Call at boot: the system clock survives
+// a soft reset, so local_now() can be used before sync() has ever run, and
+// sync() is what would otherwise set the zone.
+void apply_tz();
+
 // Starts the sync (configTzTime with TZ_STRING); non-blocking, call once
 // WiFi is connected. Safe to call again to force a resync.
 void sync();

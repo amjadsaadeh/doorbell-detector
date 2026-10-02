@@ -18,6 +18,7 @@
 #include "audio_capture.h"
 #include "mqtt_client.h"
 #include "ntp_time.h"
+#include "ota.h"
 #include "sd_storage.h"
 #include "upload_scheduler.h"
 #include "wifi_manager.h"
@@ -65,6 +66,9 @@ void network_task(void *) {
       mqtt_client::loop_tick();
       upload_scheduler::tick();
     }
+    // Outside the connected branch: a new image that never gets online must
+    // still hit its confirmation timeout and roll back.
+    ota::tick();
 
     vTaskDelay(pdMS_TO_TICKS(100));
   }
@@ -75,9 +79,11 @@ void network_task(void *) {
 void setup() {
   Serial.begin(115200);
   ntp_time::apply_tz();
+  ota::begin();
 
   if (!sd_storage::begin()) {
     Serial.println("FATAL: SD card init failed");
+    ota::roll_back_if_unconfirmed();
     while (true) {
       delay(1000);
     }
@@ -86,6 +92,7 @@ void setup() {
   if (!audio_capture::begin()) {
     Serial.println(
         "FATAL: audio_capture init failed (PSRAM or I2S/PDM mic)");
+    ota::roll_back_if_unconfirmed();
     while (true) {
       delay(1000);
     }

@@ -16,6 +16,11 @@ constexpr time_t kMinPlausibleEpoch = 1700000000; // 2023-11-14
 uint32_t g_last_sync_attempt_ms = 0;
 } // namespace
 
+void apply_tz() {
+  setenv("TZ", TZ_STRING, 1);
+  tzset();
+}
+
 void sync() {
   configTzTime(TZ_STRING, "pool.ntp.org", "time.nist.gov");
   g_last_sync_attempt_ms = millis();

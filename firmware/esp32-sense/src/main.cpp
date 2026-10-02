@@ -74,6 +74,7 @@ void network_task(void *) {
 
 void setup() {
   Serial.begin(115200);
+  ntp_time::apply_tz();
 
   if (!sd_storage::begin()) {
     Serial.println("FATAL: SD card init failed");

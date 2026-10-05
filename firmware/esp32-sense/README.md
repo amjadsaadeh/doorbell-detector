@@ -9,8 +9,8 @@ deliberately limited to recording, not detection:
    `kPreTriggerSeconds` of look-back audio (from a continuously-filling ring
    buffer) plus `kPostTriggerSeconds` more, written as
    `doorbell_manual_YYYYMMDD_HHMMSS.wav` under `/recordings/`.
-2. Once a day at ~3am local time (`kUploadHour` in `include/config.h`),
-   uploads everything under `/recordings/` to the MinIO bucket configured at
+2. On any message to `doorbell-detector/upload` (`kMqttUploadTopic` in
+   `include/config.h`), uploads everything under `/recordings/` to the MinIO bucket configured at
    build time, then deletes each file that uploaded successfully.
 
 No cross-correlation detection, no on-device ML, no camera, no GPIO button,
@@ -73,8 +73,7 @@ tz: "CET-1CEST,M3.5.0,M10.5.0/3"
 Doorbell recorder ready.
 wifi: connected, ip 192.168.178.167
 ntp: synced, local time 2026-10-01 11:39:43
-upload: pass started, 0 file(s)
-mqtt: connected, subscribe doorbell/trigger ok
+mqtt: connected, subscribe doorbell/trigger ok, doorbell/<id>/ota ok, doorbell-detector/upload ok
 ```
 
 then `mqtt: trigger …`, `record: started …` and `record: saved …` per trigger,
@@ -84,8 +83,8 @@ reset by peer" means MinIO rejected the request from its headers alone (e.g.
 `SignatureDoesNotMatch`) — `mc admin trace --errors <alias>` shows the reason.
 
 Opening the serial port resets the chip (USB-Serial-JTAG), so a monitor always
-starts from a fresh boot. The pass at boot uploads whatever is on the card,
-which makes a reset the quickest way to test uploading.
+starts from a fresh boot. Nothing uploads at boot; publish to the upload
+topic to test uploading.
 
 ## Updating over WiFi (OTA)
 
@@ -144,8 +143,9 @@ Once flashed, to confirm the two behaviors actually work:
    doorbell/trigger -m x`) and confirm a new
    `/recordings/doorbell_manual_*.wav` appears on the SD card, playable and
    ~`kPreTriggerSeconds + kPostTriggerSeconds` long (9s with the defaults).
-2. Reset the board (or wait for the configured upload hour) — the upload
-   pass at boot sends everything on the card. Confirm the log shows
+2. Publish any message to `doorbell-detector/upload` (`mosquitto_pub -h
+   <broker> -t doorbell-detector/upload -m x`) — the upload pass sends
+   everything on the card. Confirm the log shows
    `HTTP 200` and the object appears in MinIO at
    `<ESP32_MINIO_BUCKET>/esp32-recordings/<ESP32_DEVICE_ID>/<filename>.wav`.
 

@@ -2,22 +2,20 @@
 
 #include <Arduino.h>
 
-#include "config.h"
-#include "ntp_time.h"
+#include <atomic>
+
 #include "s3_uploader.h"
 #include "sd_storage.h"
 
 namespace upload_scheduler {
 
 namespace {
-bool g_uploaded_today = false;
-bool g_boot_catchup_done = false;
+std::atomic<bool> g_requested{false};
 } // namespace
 
-void begin() {
-  g_uploaded_today = false;
-  g_boot_catchup_done = false;
-}
+void begin() { g_requested = false; }
+
+void request() { g_requested = true; }
 
 namespace {
 
@@ -42,23 +40,9 @@ void run_upload_pass() {
 } // namespace
 
 void tick() {
-  if (!ntp_time::is_synced()) {
-    return;
-  }
-
-  if (!g_boot_catchup_done) {
-    g_boot_catchup_done = true;
-    run_upload_pass(); // no-op if nothing to upload
-  }
-
-  tm t = ntp_time::local_now();
-  if (t.tm_hour == kUploadHour) {
-    if (!g_uploaded_today) {
-      run_upload_pass();
-      g_uploaded_today = true;
-    }
-  } else {
-    g_uploaded_today = false; // re-arm once we leave the upload hour
+  // Clear before the pass so a request arriving mid-pass triggers another one.
+  if (g_requested.exchange(false)) {
+    run_upload_pass();
   }
 }
 

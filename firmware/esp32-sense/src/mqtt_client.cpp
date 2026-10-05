@@ -10,6 +10,7 @@
 #include "audio_capture.h"
 #include "config.h"
 #include "ota.h"
+#include "upload_scheduler.h"
 #include "wifi_manager.h"
 
 namespace mqtt_client {
@@ -27,6 +28,11 @@ std::string g_status_topic;
 void on_message(char *topic, uint8_t *payload, unsigned int length) {
   if (g_ota_topic == topic) {
     ota::request(reinterpret_cast<const char *>(payload), length);
+    return;
+  }
+  if (strcmp(topic, kMqttUploadTopic) == 0) {
+    Serial.println("mqtt: upload requested");
+    upload_scheduler::request();
     return;
   }
   Serial.printf("mqtt: trigger on %s (%u bytes)\n", topic, length);
@@ -49,9 +55,11 @@ bool connect() {
   if (ok) {
     const bool subscribed = g_client.subscribe(MQTT_TRIGGER_TOPIC);
     const bool ota_subscribed = g_client.subscribe(g_ota_topic.c_str());
-    Serial.printf("mqtt: connected, subscribe %s %s, %s %s\n",
+    const bool upload_subscribed = g_client.subscribe(kMqttUploadTopic);
+    Serial.printf("mqtt: connected, subscribe %s %s, %s %s, %s %s\n",
                   MQTT_TRIGGER_TOPIC, subscribed ? "ok" : "FAILED",
-                  g_ota_topic.c_str(), ota_subscribed ? "ok" : "FAILED");
+                  g_ota_topic.c_str(), ota_subscribed ? "ok" : "FAILED",
+                  kMqttUploadTopic, upload_subscribed ? "ok" : "FAILED");
     ota::on_mqtt_connected();
   } else {
     Serial.printf("mqtt: connect failed, state %d\n", g_client.state());

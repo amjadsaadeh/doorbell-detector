@@ -87,7 +87,7 @@ void finish_recording() {
   const std::string tmp_path = sd_storage::temp_path_for(g_clip_final_path);
 
   // Block indefinitely for the SD mutex rather than timing out: the only
-  // other holder is the daily upload pass, which always releases it in
+  // other holder is the upload pass, which always releases it in
   // bounded time, and dropping a just-captured clip because an upload was
   // mid-transfer would be worse than a few extra seconds of write latency.
   bool saved = false;

@@ -49,9 +49,9 @@ constexpr const char *kTempSuffix = ".tmp";
 #define MQTT_PORT 1883
 #endif
 
-// --- Daily upload ------------------------------------------------------------
-constexpr int kUploadHour = 3; // local time, from NTP + TZ_STRING
-constexpr uint32_t kSchedulerPollIntervalMs = 10 * 60 * 1000; // 10 min
+// --- Upload ------------------------------------------------------------------
+// Any message on this topic uploads everything on the SD card to MinIO.
+constexpr const char *kMqttUploadTopic = "doorbell-detector/upload";
 constexpr uint32_t kNtpResyncIntervalMs = 6UL * 60 * 60 * 1000; // 6 hours
 
 // --- S3 / MinIO --------------------------------------------------------------

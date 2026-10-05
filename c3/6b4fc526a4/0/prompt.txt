@@ -1,0 +1,5 @@
+The firmware got a hardcoded upload time. replace this time to an upload triggered by an mqtt topic called dorrbell-detector/upload
+
+---
+
+ok trigger ota and check if it worked

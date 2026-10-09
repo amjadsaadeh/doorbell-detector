@@ -1,7 +1,7 @@
 #include "audio_capture.h"
 
 #include <Arduino.h>
-#include <I2S.h>
+#include <driver/i2s.h>
 #include <esp_heap_caps.h>
 
 #include <cstdio>
@@ -32,6 +32,8 @@ uint8_t *g_clip_buf = nullptr;
 size_t g_clip_len = 0;
 size_t g_clip_target_len = 0;
 std::string g_clip_final_path;
+
+constexpr i2s_port_t kI2sPort = I2S_NUM_0;
 
 uint8_t g_read_chunk[kPdmReadChunkBytes];
 
@@ -125,13 +127,32 @@ bool begin() {
     return false;
   }
 
-  // This core's I2SClass (framework-arduinoespressif32 3.20017.x) predates
-  // the newer setPinsPdmRx()/I2S_MODE_PDM_RX API documented for later cores;
-  // setAllPins(sck, fs, sd, outSd, inSd) + PDM_MONO_MODE is what actually
-  // compiles against the pinned platform version. The PDM clock line maps to
-  // the "FS" pin slot and the PDM data line to "SD" in this API's naming.
-  I2S.setAllPins(-1, kPdmClkPin, kPdmDataPin, -1, -1);
-  if (!I2S.begin(PDM_MONO_MODE, kSampleRateHz, kBitsPerSample)) {
+  // Use the IDF I2S driver directly. The Arduino I2S library on this core
+  // (framework-arduinoespressif32 3.20017.x) configures the DMA for stereo
+  // and reads only half of each DMA buffer per event, so PDM_MONO_MODE
+  // delivered ~8 kS/s while the WAV header claimed 16 kHz (recordings played
+  // too fast and pitched up). ONLY_LEFT gives one 16-bit sample per frame at
+  // exactly kSampleRateHz. In PDM RX the clock pin is the "WS" slot.
+  i2s_config_t cfg = {};
+  cfg.mode = static_cast<i2s_mode_t>(I2S_MODE_MASTER | I2S_MODE_RX |
+                                     I2S_MODE_PDM);
+  cfg.sample_rate = kSampleRateHz;
+  cfg.bits_per_sample = I2S_BITS_PER_SAMPLE_16BIT;
+  cfg.channel_format = I2S_CHANNEL_FMT_ONLY_LEFT;
+  cfg.communication_format = I2S_COMM_FORMAT_STAND_I2S;
+  cfg.intr_alloc_flags = ESP_INTR_FLAG_LEVEL1;
+  cfg.dma_buf_count = 8;
+  cfg.dma_buf_len = 512;
+  if (i2s_driver_install(kI2sPort, &cfg, 0, nullptr) != ESP_OK) {
+    return false;
+  }
+  i2s_pin_config_t pins = {};
+  pins.mck_io_num = I2S_PIN_NO_CHANGE;
+  pins.bck_io_num = I2S_PIN_NO_CHANGE;
+  pins.ws_io_num = kPdmClkPin;
+  pins.data_out_num = I2S_PIN_NO_CHANGE;
+  pins.data_in_num = kPdmDataPin;
+  if (i2s_set_pin(kI2sPort, &pins) != ESP_OK) {
     return false;
   }
 
@@ -139,7 +160,10 @@ bool begin() {
 }
 
 void loop_tick() {
-  int n = I2S.read(g_read_chunk, sizeof(g_read_chunk));
+  size_t bytes_read = 0;
+  i2s_read(kI2sPort, g_read_chunk, sizeof(g_read_chunk), &bytes_read,
+           pdMS_TO_TICKS(100));
+  const int n = static_cast<int>(bytes_read);
   if (n <= 0) {
     return;
   }

@@ -1,0 +1,5 @@
+Take at look at the firmware. My recordings seem to have the wrong samplerate, at least it sounds too fast and also pitched high. My assumoption the wav file got a too high sampling rate, check this or find the issue
+
+---
+
+I attached the esp32 device, continue with your investigation

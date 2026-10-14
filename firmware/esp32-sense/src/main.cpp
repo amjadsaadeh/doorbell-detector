@@ -1,14 +1,14 @@
 // XIAO ESP32S3 Sense doorbell recorder.
 //
-// Scope: (1) MQTT-triggered recording to SD, (2) once-daily upload of the SD
-// card's contents to MinIO. No cross-correlation detection, no on-device ML,
+// Scope: (1) MQTT-triggered recording to SD, (2) upload of the SD card's
+// contents to MinIO on an MQTT request. No cross-correlation detection, no on-device ML,
 // no camera use — see firmware/esp32-sense/README.md and the project plan
 // this was built from.
 //
 // Concurrency: Arduino's loop() already runs as its own FreeRTOS task
 // (pinned to core 1 by default) — that's where audio_capture lives, so it
 // spawns no task of its own. One extra task, networkTask (core 0), services
-// WiFi/MQTT and the daily upload scheduler.
+// WiFi/MQTT and the upload passes.
 #include <Arduino.h>
 #include <WiFi.h>
 

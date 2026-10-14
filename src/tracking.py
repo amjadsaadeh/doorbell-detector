@@ -181,9 +181,10 @@ def read_run_handoff() -> str | None:
 def promotes_champion(passed: bool) -> bool:
     """Whether this run may move the `champion` alias.
 
-    Two conditions, and the second is the one that was missing. The gate has
-    to pass -- but passing only means int8 did not damage the float model. It
-    says nothing about whether this model beats the one already shipping, so
+    The gate has to pass, the run must be outside a DVC experiment, and
+    tracked source and params must be committed. Passing the gate only means
+    int8 did not damage the float model. It says nothing about whether this
+    model beats the one already shipping, so
     the gate alone let every passing sweep variant take the alias in turn: the
     first clean sweep ended with @champion on stft (val_f1 0.8888) instead of
     logmel (0.9931), purely because stft ran later.
@@ -193,7 +194,7 @@ def promotes_champion(passed: bool) -> bool:
     inspectable, but promoting one is a deliberate act -- commit its params,
     or set the alias by hand.
     """
-    return passed and dvc_exp_name() is None
+    return passed and dvc_exp_name() is None and not is_dirty()
 
 
 def register_int8_model(run_id: str, artifact_uri: str, passed: bool, tags: dict):

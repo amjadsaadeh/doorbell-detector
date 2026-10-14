@@ -44,6 +44,7 @@ from tflite_utils import build_export_model, largest_activation_bytes, tflite_pr
 from dataset import load_dataset
 from tracking import (
     MLFLOW_EXPERIMENT_NAME,
+    dvc_exp_name,
     read_run_handoff,
     register_int8_model,
     run_name,
@@ -288,8 +289,10 @@ def main():
                 alias_note = " (champion)"
             elif not passed:
                 alias_note = " (not aliased: gate failed)"
-            else:
+            elif dvc_exp_name():
                 alias_note = " (not aliased: dvc exp variant, promote by hand)"
+            else:
+                alias_note = " (not aliased: uncommitted source or params)"
             print(f"registered    : v{version.version}{alias_note}")
 
             if not passed and on_failure == "fail":

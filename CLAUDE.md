@@ -137,7 +137,7 @@ full parameter reference and the per-stage command list.
 - **The int8 graph is registered** as `doorbell-detector-int8`. This is what makes
   "which run produced the `.tflite` on the device" a lookup rather than an md5 hunt.
   `@champion` moves only when the gate passes **and** the run is a plain `dvc repro`
-  of the committed config, never a `dvc exp run` variant (`tracking.promotes_champion`).
+  with clean tracked source and params, never a `dvc exp run` variant (`tracking.promotes_champion`).
   The gate alone is not enough: it measures quantization damage, not quality, so on the
   first clean sweep every passing variant took the alias in turn and it ended on stft
   (0.8888) instead of logmel (0.9931). Every version is still registered, with a

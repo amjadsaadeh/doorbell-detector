@@ -183,7 +183,7 @@ def test_dvc_exp_does_not_hide_real_source_changes(repo, monkeypatch):
     assert tracking.is_dirty() is True
 
 
-def test_passing_workspace_run_promotes_champion(monkeypatch):
+def test_passing_workspace_run_promotes_champion(repo, monkeypatch):
     monkeypatch.delenv("DVC_EXP_NAME", raising=False)
     assert tracking.promotes_champion(passed=True) is True
 
@@ -202,3 +202,25 @@ def test_sweep_variant_never_promotes_champion(monkeypatch):
 def test_failed_gate_never_promotes_champion(monkeypatch):
     monkeypatch.delenv("DVC_EXP_NAME", raising=False)
     assert tracking.promotes_champion(passed=False) is False
+
+
+@pytest.mark.parametrize("filename", ["file.txt", "params.yaml"])
+@pytest.mark.parametrize("staged", [False, True])
+def test_dirty_workspace_never_promotes_champion(repo, monkeypatch, filename, staged):
+    """A passing local experiment must not replace the shipping model."""
+    monkeypatch.delenv("DVC_EXP_NAME", raising=False)
+    _commit_params(repo)
+    (repo / filename).write_text("uncommitted experiment\n")
+    if staged:
+        subprocess.run(["git", "add", filename], cwd=repo, check=True,
+                       capture_output=True)
+    assert tracking.promotes_champion(passed=True) is False
+
+
+def test_pipeline_outputs_do_not_block_champion(repo, monkeypatch):
+    monkeypatch.delenv("DVC_EXP_NAME", raising=False)
+    (repo / "dvc.lock").write_text("initial\n")
+    _commit_params(repo)
+    (repo / "dvc.lock").write_text("updated by repro\n")
+    (repo / "output.h5").write_text("untracked output\n")
+    assert tracking.promotes_champion(passed=True) is True

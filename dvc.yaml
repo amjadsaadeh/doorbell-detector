@@ -140,6 +140,7 @@ stages:
     - src/train_model.py
     - src/train_cnn.py
     - src/train_xgboost.py
+    - src/tracking.py
     - src/dataset.py
     - src/features.py
     - src/oof.py
@@ -189,6 +190,7 @@ stages:
     - src/tflite_utils.py
     - src/train_cnn.py
     - src/train_xgboost.py
+    - src/tracking.py
     - src/dataset.py
     - src/provenance.py
     - src/paths.py

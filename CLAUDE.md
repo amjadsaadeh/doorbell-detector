@@ -63,9 +63,10 @@ full parameter reference and the per-stage command list.
   chunks would tune the ranges to the data the next stage scores against — and the
   saved `row_index` values are dataset-global, so they join straight back to
   `chunk_manifest.csv` (`calibration_manifest.csv` is the human-readable view).
-- **`evaluate_quantized` logs its own MLflow run**, named after the training run with a
-  `-quantized` suffix (e.g. `cnn-logmel-unified-pipeline-quantized`, tagged
-  `stage=quantized`). It carries the calibration `.npz` + `.csv` as artifacts and its
+- **`evaluate_quantized` logs its own MLflow run**, a child of the training run named
+  with an `-int8` suffix (e.g. `cnn-logmel@0219987-int8`, tagged `stage=quantized`).
+  Runs from before `src/tracking.py` used `-quantized` and, earlier, `tflite-int8-*`;
+  those live in the `doorbell-detector-legacy` experiment. It carries the calibration `.npz` + `.csv` as artifacts and its
   md5 as a param, so a quantized model in MLflow can be matched to a DVC-tracked
   calibration set. `quantization.max_f1_drop` fails the stage on collapse.
 - **The quantized run measures a delta, not quality**, and is tagged
@@ -99,10 +100,48 @@ full parameter reference and the per-stage command list.
   to MLflow (experiment `doorbell-detector`) at `MLFLOW_TRACKING_URI` — a self-hosted
   server (`https://mlflow.saadeh.dev`), not managed from this repo. `dvc metrics
   show`/`dvc plots diff` no longer cover training metrics; check the MLflow UI instead.
-  Runs are named `<head>-<feature_type>-<git_branch>` (feature type read from the
-  `feature_type` attribute of `balanced_data.h5`) and log `balanced_data_md5` — the md5
-  DVC records for the dataset — so every run traces to an exact, `dvc pull`-able
-  dataset version.
+- **`src/tracking.py` is the single definition of run identity**, imported by both
+  trainers and `evaluate_quantized`. Runs are named `<head>-<feature_type>@<commit>`
+  (e.g. `cnn-logmel@2cb39e1`, the int8 child `…-int8`), **not** by branch. Branch was
+  the previous naming field and it is the one that breaks: `git rev-parse --abbrev-ref
+  HEAD` returns the literal string `"HEAD"` inside the detached worktree `dvc exp run
+  --temp` uses, so the entire feature/head sweep logged as `cnn-mfcc-HEAD` with no
+  recoverable commit. The commit does not need capturing — MLflow already records it
+  as `mlflow.source.git.commit` on every run. `git_ref` falls back to
+  `detached@<DVC_EXP_BASELINE_REV>`, and `dvc_exp` carries `DVC_EXP_NAME`, which DVC
+  exports into the stage environment.
+- **Tags carry the comparison axes, params carry the settings.** The MLflow UI can
+  group and filter by tag but not by param, so `feature_type`, `head`, `stage`
+  (`train`/`quantized`) and `dataset_md5` are tags. `dataset_md5` is the md5 DVC
+  records for `balanced_data.h5`, so a run traces to an exact `dvc pull`-able dataset —
+  and because both stages now tag it, a model and its int8 counterpart can be joined.
+  A `+dirty` suffix on the run name marks a run whose tracked source did not match its
+  commit. `dvc.lock` is always excluded from that check, since the `dvc repro` running
+  the stage rewrites it and would otherwise mark every run dirty. Under `dvc exp run`,
+  `params.yaml` is excluded too: `-S` applies overrides by rewriting it, and DVC records
+  that rewrite in the experiment. Without that second exclusion every swept variant of
+  the first clean sweep came out `+dirty` with nothing actually uncommitted.
+- **Per-fold metrics are steps, not key prefixes.** `mlflow.log_metrics(…, step=fold)`
+  under `byfold_*`. The old `fold{i}_<metric>` prefix minted a new metric key per fold —
+  40 of them at five folds — and each became a permanent column in the cross-run
+  comparison table, to hold a number only meaningful inside its own run. Likewise the
+  eight `dq_raw_*`/`dq_balanced_*` metrics were dropped: they describe the *dataset*, are
+  identical for a given `dataset_md5`, and the same JSON is already logged as an
+  artifact by the same function. Net effect ~80 metric keys per run → ~40, of which ~15
+  are the summary axis you actually rank variants on.
+- **The quantized run is a child of the training run.** `train_model` writes its run id
+  to `models/trained/mlflow_run.json` — inside an existing DVC output of that stage and
+  a dependency of both downstream stages, so the handoff travels the dependency graph
+  and needed no `dvc.yaml` change. `evaluate_quantized` reads it and passes
+  `parent_run_id`. A missing file is not an error: the run logs top-level, as before.
+- **The int8 graph is registered** as `doorbell-detector-int8`. This is what makes
+  "which run produced the `.tflite` on the device" a lookup rather than an md5 hunt.
+  `@champion` moves only when the gate passes **and** the run is a plain `dvc repro`
+  of the committed config, never a `dvc exp run` variant (`tracking.promotes_champion`).
+  The gate alone is not enough: it measures quantization damage, not quality, so on the
+  first clean sweep every passing variant took the alias in turn and it ended on stft
+  (0.8888) instead of logmel (0.9931). Every version is still registered, with a
+  `promoted` tag; to ship a variant, commit its params or set the alias by hand.
 - **Label Studio auth** is a JWT personal access token: `fetch_data.sh` exchanges it
   via `/api/token/refresh` for a Bearer token (legacy `Token` header returns 401).
 - **Incrementality:** `data/audio` is a `persist: true` output — unchanged labels skip
@@ -152,7 +191,7 @@ full parameter reference and the per-stage command list.
   and fold 0 is the smallest and easiest. The same log-mel model that scores 1.0000 on
   fold 0 scores **0.9931 ± 0.0095, worst fold 0.9742** across all five. MLflow gets the
   mean under the plain name (`val_f1_score`) plus `_std` / `_min` companions and
-  per-fold `fold{i}_*` metrics. `training.n_eval_folds: null` means all folds; set it
+  per-fold `byfold_*` metrics, one key each, stepped by fold. `training.n_eval_folds: null` means all folds; set it
   to 1 for a fast iteration loop, at the old credibility.
 - **The shipped model is a final refit on 100% of the chunks**, trained after the CV
   loop. CV establishes what a model built this way scores; the refit is the deliverable
@@ -238,7 +277,7 @@ matching, GPIO button trigger, Prometheus metrics/health endpoint.
 - Cross-correlation is slow enough to drop audio in saved clips if not handled carefully (see `c8c2788`)
 - Root `requirements.txt` was removed — `pyproject.toml`/`uv.lock` is the single source
   of pipeline dependencies (`data_collection/requirements.txt` remains for the Pi)
-- All 146 tests pass; run with `PYTHONPATH=./src:. uv run pytest tests/`
+- All 166 tests pass; run with `PYTHONPATH=./src:. uv run pytest tests/`
 
 ## Key Files
 
@@ -262,6 +301,7 @@ matching, GPIO button trigger, Prometheus metrics/health endpoint.
 | `src/train_model.py` | Head dispatcher (`training.head`) + feature/head compatibility check |
 | `src/train_cnn.py` | Small keyword-spotting CNN, MLflow tracking |
 | `src/train_xgboost.py` | XGBoost head, MLflow tracking, shared metric/quality helpers |
+| `src/tracking.py` | Run identity: naming, the tag vocabulary, train→quantize handoff, registry |
 | `src/splits.py` | Group-aware CV folds + fold-metric aggregation, shared by both heads |
 | `src/oof.py` | Held-out per-chunk predictions collected across the CV folds |
 | `src/provenance.py` | Where a chunk came from: the manifest join every per-chunk diagnostic uses |

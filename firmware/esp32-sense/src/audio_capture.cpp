@@ -5,10 +5,12 @@
 #include <esp_heap_caps.h>
 
 #include <cstdio>
+#include <atomic>
 #include <cstring>
 #include <string>
 
 #include "config.h"
+#include "model_detector.h"
 #include "ntp_time.h"
 #include "sd_storage.h"
 #include "wav_writer.h"
@@ -20,7 +22,7 @@ namespace {
 enum class State { kIdle, kRecording };
 
 TaskHandle_t g_loop_task = nullptr;
-State g_state = State::kIdle;
+std::atomic<State> g_state{State::kIdle};
 
 // Pre-trigger ring buffer (PSRAM). Owned exclusively by loop_tick()/core 1.
 uint8_t *g_ring_buf = nullptr;
@@ -34,6 +36,7 @@ size_t g_clip_target_len = 0;
 std::string g_clip_final_path;
 
 constexpr i2s_port_t kI2sPort = I2S_NUM_0;
+QueueHandle_t g_i2s_events = nullptr;
 
 uint8_t g_read_chunk[kPdmReadChunkBytes];
 
@@ -59,23 +62,25 @@ void ring_snapshot_into(uint8_t *dst) {
   memcpy(dst + tail_len, g_ring_buf, g_ring_write_pos);
 }
 
-std::string make_filename() {
+std::string make_filename(bool detection) {
   char name[64];
   if (ntp_time::is_synced()) {
     tm t = ntp_time::local_now();
-    std::strftime(name, sizeof(name), "doorbell_manual_%Y%m%d_%H%M%S.wav",
+    std::strftime(name, sizeof(name), detection ? "doorbell_detection_%Y%m%d_%H%M%S.wav"
+                             : "doorbell_manual_%Y%m%d_%H%M%S.wav",
                    &t);
   } else {
     // NTP hasn't synced yet (e.g. a trigger fires seconds after boot) —
     // fall back to a millis()-based name so the recording isn't dropped.
-    std::snprintf(name, sizeof(name), "doorbell_manual_boot_%lu.wav",
+    std::snprintf(name, sizeof(name), detection ? "doorbell_detection_boot_%lu.wav"
+                             : "doorbell_manual_boot_%lu.wav",
                   static_cast<unsigned long>(millis()));
   }
   return std::string(kRecordingsDir) + "/" + name;
 }
 
-void begin_recording() {
-  g_clip_final_path = make_filename();
+void begin_recording(bool detection) {
+  g_clip_final_path = make_filename(detection);
   ring_snapshot_into(g_clip_buf);
   g_clip_len = g_ring_filled; // pre-trigger portion (may be < kRingBufferBytes
                               // only in the first kPreTriggerSeconds after boot)
@@ -108,6 +113,17 @@ void finish_recording() {
   Serial.printf("record: %s %s (%u bytes)\n", saved ? "saved" : "FAILED to save",
                 g_clip_final_path.c_str(), static_cast<unsigned>(g_clip_len));
 
+  // SD writes can block longer than DMA capacity. Discard buffered audio
+  // so neither the frontend nor the next pre-trigger clip bridges that gap.
+  for (size_t i = 0; i < 16; ++i) {
+    size_t drained = 0;
+    i2s_read(kI2sPort, g_read_chunk, sizeof(g_read_chunk), &drained, 0);
+    if (!drained) break;
+  }
+  g_ring_filled = g_ring_write_pos = 0;
+  model_detector::discontinuity();
+  uint32_t ignored;
+  xTaskNotifyWait(0, UINT32_MAX, &ignored, 0);
   g_state = State::kIdle;
 }
 
@@ -143,7 +159,7 @@ bool begin() {
   cfg.intr_alloc_flags = ESP_INTR_FLAG_LEVEL1;
   cfg.dma_buf_count = 8;
   cfg.dma_buf_len = 512;
-  if (i2s_driver_install(kI2sPort, &cfg, 0, nullptr) != ESP_OK) {
+  if (i2s_driver_install(kI2sPort, &cfg, 16, &g_i2s_events) != ESP_OK) {
     return false;
   }
   i2s_pin_config_t pins = {};
@@ -160,27 +176,36 @@ bool begin() {
 }
 
 void loop_tick() {
+  i2s_event_t event;
+  while (xQueueReceive(g_i2s_events, &event, 0) == pdTRUE) {
+    if (event.type == I2S_EVENT_RX_Q_OVF) {
+      model_detector::discontinuity();
+      g_ring_filled = g_ring_write_pos = 0;
+    }
+  }
   size_t bytes_read = 0;
   i2s_read(kI2sPort, g_read_chunk, sizeof(g_read_chunk), &bytes_read,
            pdMS_TO_TICKS(100));
   const int n = static_cast<int>(bytes_read);
   if (n <= 0) {
+    model_detector::discontinuity();
     return;
   }
 
+  model_detector::feed(g_read_chunk, static_cast<size_t>(n));
+  ring_append(g_read_chunk, static_cast<size_t>(n));
+  uint32_t trigger = 0;
+  xTaskNotifyWait(0, UINT32_MAX, &trigger, 0);
   if (g_state == State::kIdle) {
-    ring_append(g_read_chunk, static_cast<size_t>(n));
 
-    if (ulTaskNotifyTake(pdTRUE, 0) > 0) {
-      begin_recording();
+    if (trigger) {
+      begin_recording(trigger & 2);
     }
     return;
   }
 
-  // kRecording: append straight into the clip buffer (the ring buffer is
-  // intentionally not fed during this window, matching the Pi's behavior of
-  // reading post-trigger audio directly rather than through the pre-trigger
-  // buffer).
+  // kRecording: append post-trigger audio; notifications during an existing
+  // recording have already been consumed and are deliberately ignored.
   size_t remaining = g_clip_target_len - g_clip_len;
   size_t to_copy = min(remaining, static_cast<size_t>(n));
   memcpy(g_clip_buf + g_clip_len, g_read_chunk, to_copy);
@@ -191,9 +216,9 @@ void loop_tick() {
   }
 }
 
-void request_recording() {
+void request_recording(bool detection) {
   if (g_loop_task != nullptr) {
-    xTaskNotifyGive(g_loop_task);
+    xTaskNotify(g_loop_task, detection ? 2 : 1, eSetBits);
   }
 }
 

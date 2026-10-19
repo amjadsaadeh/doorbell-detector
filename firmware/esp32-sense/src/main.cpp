@@ -1,14 +1,3 @@
-// XIAO ESP32S3 Sense doorbell recorder.
-//
-// Scope: (1) MQTT-triggered recording to SD, (2) upload of the SD card's
-// contents to MinIO on an MQTT request. No cross-correlation detection, no on-device ML,
-// no camera use — see firmware/esp32-sense/README.md and the project plan
-// this was built from.
-//
-// Concurrency: Arduino's loop() already runs as its own FreeRTOS task
-// (pinned to core 1 by default) — that's where audio_capture lives, so it
-// spawns no task of its own. One extra task, networkTask (core 0), services
-// WiFi/MQTT and the upload passes.
 #include <Arduino.h>
 #include <WiFi.h>
 
@@ -16,6 +5,7 @@
 #include <ctime>
 
 #include "audio_capture.h"
+#include "model_detector.h"
 #include "mqtt_client.h"
 #include "ntp_time.h"
 #include "ota.h"
@@ -27,7 +17,6 @@ namespace {
 
 void network_task(void *) {
   wifi_manager::begin();
-  mqtt_client::begin();
   upload_scheduler::begin();
 
   bool ntp_started = false;
@@ -98,10 +87,21 @@ void setup() {
     }
   }
 
+  mqtt_client::begin();
+  if (!model_detector::begin()) {
+    Serial.println("FATAL: model initialization failed");
+    ota::roll_back_if_unconfirmed();
+    while (true) delay(1000);
+  }
+
   // Core 0 for networking, matching the design's split from Arduino's
   // loop()/core 1 running the audio capture path.
-  xTaskCreatePinnedToCore(network_task, "networkTask", 8192, nullptr, 1,
-                          nullptr, 0);
+  if (xTaskCreatePinnedToCore(network_task, "networkTask", 8192, nullptr, 1,
+                              nullptr, 0) != pdPASS) {
+    Serial.println("FATAL: network task allocation failed");
+    ota::roll_back_if_unconfirmed();
+    while (true) delay(1000);
+  }
 
   // An IANA name like "Europe/Berlin" is not understood by newlib and is
   // silently treated as UTC; a POSIX TZ string always carries an offset digit.

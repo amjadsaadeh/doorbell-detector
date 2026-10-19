@@ -9,6 +9,9 @@ namespace mqtt_client {
 
 void begin();
 
+// Thread-safe pending event; networking alone owns PubSubClient.
+void notify_detection();
+
 // Services the MQTT client (must be called frequently from networkTask) and
 // reconnects if the connection dropped.
 void loop_tick();

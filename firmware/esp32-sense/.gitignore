@@ -1,3 +1,5 @@
 .env.esp32
 .pio/
 *.swp
+
+lib/doorbell_model/

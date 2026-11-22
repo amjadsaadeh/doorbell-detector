@@ -18,7 +18,7 @@ So I decided to try to detect the sound of the doorbell by microphone.
 A [Raspberry Pi Zero W](https://www.raspberrypi.com/products/raspberry-pi-zero-2-w/) with a [ReSpeaker 2 Mics Pi HAT](https://wiki.seeedstudio.com/ReSpeaker_2_Mics_Pi_HAT/) listens next to the door.
 All audio is 16 kHz, mono, int16.
 
-The trained model targets an **ESP32-S3** as its eventual inference host, which is why the pipeline ends in an int8 TFLite export — the model has to fit in the microcontroller's SRAM.
+The trained model targets an **ESP32-S3**. The [device firmware](firmware/esp32-sense/README.md) runs the int8 CNN with an incremental log-mel frontend and publishes detections over MQTT.
 
 # How It Works
 
@@ -343,4 +343,4 @@ With `training.n_eval_folds` capped to 1, only that fold's chunks have a held-ou
 v1.0 of the on-Pi detector is deployed and working (cross-correlation + MQTT + clip capture).
 The ML pipeline trains a log-mel CNN and exports a 26 KB int8 TFLite model with a 125 KB activation footprint, sized for an ESP32-S3.
 
-Ideas for later: multiple templates, frequency-domain matching, GPIO button trigger, Prometheus metrics, firmware for the ESP32-S3, and a fixed holdout so the shipped weights get a held-out score of their own.
+Ideas for later: multiple templates, frequency-domain matching, GPIO button trigger, Prometheus metrics and a fixed holdout so the shipped weights get a held-out score of their own.

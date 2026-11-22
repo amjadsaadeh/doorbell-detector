@@ -69,3 +69,8 @@ constexpr uint32_t kOtaConfirmTimeoutMs = 5 * 60 * 1000;
 // ESP32_MINIO_FIRMWARE_PREFIX, or this when that is unset. Kept outside
 // raw/, which is Label Studio's source storage.
 constexpr const char *kDefaultFirmwarePrefix = "doorbell-detector/firmware";
+
+// On-device model policy: 2 s context, one score every 500 ms.
+constexpr float kDetectionThreshold = 0.5f;
+constexpr uint32_t kDetectionCooldownMs = 10000;
+constexpr const char* kMqttDetectionTopic = "doorbell/detected";

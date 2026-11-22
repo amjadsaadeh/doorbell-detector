@@ -5,6 +5,7 @@
 #include <WiFi.h>
 
 #include <cstring>
+#include <ctime>
 #include <string>
 
 #include "audio_capture.h"
@@ -22,6 +23,8 @@ PubSubClient g_client(g_wifi_client);
 uint32_t g_last_reconnect_attempt_ms = 0;
 constexpr uint32_t kReconnectIntervalMs = 5000;
 
+struct Detection { time_t time; uint32_t millis; };
+QueueHandle_t g_detections = nullptr;
 std::string g_ota_topic;
 std::string g_status_topic;
 
@@ -69,7 +72,17 @@ bool connect() {
 
 } // namespace
 
+void notify_detection() {
+  if (g_detections) {
+    const Detection event{std::time(nullptr), millis()};
+    xQueueSend(g_detections, &event, 0);
+  }
+}
+
 void begin() {
+  static StaticQueue_t control;
+  static uint8_t storage[4 * sizeof(Detection)];
+  g_detections = xQueueCreateStatic(4, sizeof(Detection), storage, &control);
   const std::string device_prefix =
       std::string(kMqttDeviceTopicPrefix) + DEVICE_ID;
   g_ota_topic = device_prefix + "/ota";
@@ -92,6 +105,24 @@ void loop_tick() {
   }
 
   g_client.loop();
+  Detection event;
+  if (g_detections && xQueuePeek(g_detections, &event, 0) == pdTRUE) {
+    if (uint32_t(millis() - event.millis) > 30000) {
+      xQueueReceive(g_detections, &event, 0);
+    } else {
+      if (event.time < 1700000000) {
+        const time_t now = std::time(nullptr);
+        if (now < 1700000000) return; // wait briefly for the first NTP sync
+        event.time = now - uint32_t(millis() - event.millis) / 1000;
+      }
+      tm utc;
+      gmtime_r(&event.time, &utc);
+      char stamp[32];
+      std::strftime(stamp, sizeof(stamp), "%Y-%m-%dT%H:%M:%SZ", &utc);
+      if (g_client.publish(kMqttDetectionTopic, stamp, false))
+        xQueueReceive(g_detections, &event, 0);
+    }
+  }
 }
 
 bool is_connected() { return g_client.connected(); }

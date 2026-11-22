@@ -1,8 +1,8 @@
-# ESP32-S3 Sense doorbell recorder
+# ESP32-S3 Sense doorbell detector
 
 Firmware for a Seeed XIAO ESP32S3 Sense that replaces the Raspberry Pi Zero W
-recording path (`data_collection/detector.py` / `data_collector.py`). Scope is
-deliberately limited to recording, not detection:
+recording path (`data_collection/detector.py` / `data_collector.py`) and runs the
+trained int8 log-mel CNN locally:
 
 1. Subscribes to an MQTT topic (`ESP32_MQTT_TRIGGER_TOPIC`, default
    `doorbell/trigger`); any message on it records a clip to the SD card —
@@ -13,9 +13,66 @@ deliberately limited to recording, not detection:
    `include/config.h`), uploads everything under `/recordings/` to the MinIO bucket configured at
    build time, then deletes each file that uploaded successfully.
 
-No cross-correlation detection, no on-device ML, no camera, no GPIO button,
-no TLS (matches the existing LAN-only MQTT/MinIO deployment) — see the
-project plan this was built from for the full rationale.
+3. Computes one centered log-mel frame every 20 ms and scores the latest
+   40 × 100 window every 500 ms using TFLite Micro and ESP-NN. A score **above
+   0.5** triggers a recording (`doorbell_detection_…wav`) and publishes a UTC
+   ISO-8601 timestamp to `doorbell/detected`, with a 10-second cooldown.
+   Both settings are in `include/config.h`.
+
+The capture loop feeds a bounded PSRAM queue; inference has its own task and
+never calls the network client. The ring buffer keeps updating during recording.
+Queue overflow or a blocking SD save resets inference context, requiring a new
+2-second window. Network events expire after 30 seconds; publishing uses the
+existing PubSubClient QoS 0 connection, so delivery is best-effort. SD recording
+works while offline. NTP must synchronize before a timestamp can be published.
+
+## Prepare and verify the model
+
+From the repository root, restore the DVC artifacts or run the training/export
+pipeline, then prepare the firmware package:
+
+```bash
+uv run dvc pull
+PYTHONPATH=src uv run python src/prepare_esp32_model.py
+ESP32_MQTT_PORT=1883 firmware/esp32-sense/build.sh run -e seeed_xiao_esp32s3
+```
+
+The preparation step accepts only the supported 16 kHz, 2-second, 40 × 100
+log-mel CNN configuration. It rechecks float-versus-int8 F1 on the local dataset
+without contacting MLflow, generates the C model and two boot test vectors, and
+records SHA-256 hashes. A subsequent build rejects changed params, weights, or
+generated model files until preparation runs again. Generated model files live
+in ignored `lib/doorbell_model/`; DVC remains the model source of truth.
+
+The first build downloads pinned upstream [esp-tflite-micro v1.3.1](https://github.com/espressif/esp-tflite-micro/tree/0032f1734e1e7b5fcf1b588cf1abb9ef53fed4c3)
+and [ESP-NN v1.1.2](https://github.com/espressif/esp-nn/tree/596b08401a63da3a2e1b40868c442f582a99ae26)
+into `.pio/upstream/`. These support the existing Arduino/IDF toolchain.
+Only kernels required by this model are linked.
+
+```bash
+PYTHONPATH=src:. uv run pytest tests/esp32_frontend_test.py
+firmware/esp32-sense/build.sh test -e native
+python3 firmware/esp32-sense/tools/check_model_host.py
+```
+
+Run PlatformIO test and build commands sequentially; its test runner cleans build
+state. The host model check uses TFLM reference kernels. At boot the board runs
+the same vectors with ESP-NN (within one output quantization step), reports arena
+usage and latency, and refuses to start detection if either fails. Live scores
+and inference times are printed to serial.
+
+The frontend reproduces librosa's periodic Hann window, Slaney mel weights,
+centered zero padding, unscaled FFT power, natural logarithm, and mel-major
+layout. Its tables are generated from Python. Double-precision FFT intermediates
+preserve parity even for nearly silent tone bins; the model input remains int8.
+Normalization is already inside the graph. The tests compare several streaming
+windows against librosa at an absolute tolerance of 1e-3.
+
+Before deployment, verify boot tests and sustained capture on the board, measure
+inference latency under WiFi/upload load, and exercise a real bell through MQTT
+and SD capture. The arena prefers internal SRAM and falls back to PSRAM; its
+actual speed and the PDM microphone's effect on detection require hardware
+validation. OTA and the existing direct SD-to-MinIO upload path remain in use.
 
 ## Prerequisites
 

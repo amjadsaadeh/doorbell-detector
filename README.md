@@ -32,7 +32,7 @@ With the `--save` flag it also keeps a ring buffer and writes a timestamped WAV 
 
 ## Data & labeling: Label Studio + S3
 
-The recorded clips land in a self-hosted MinIO (S3-compatible) bucket:
+The recorded clips land in a self-hosted S3-compatible bucket. It was MinIO until 2026-11-25 and is now [Garage](https://garagehq.deuxfleurs.fr/) (`192.168.178.185:3900`, region `garage`); the layout and the `doorbell-detector` bucket name did not change:
 
 - `raw/` — the audio clips, connected to [Label Studio](https://labelstud.io/) as source storage
 - `annotations/` — Label Studio syncs its annotations here (backup)
@@ -159,7 +159,7 @@ Credentials live in a git-ignored `.env`:
 ```
 LABEL_STUDIO_URL=...        # Label Studio instance
 LABEL_STUDIO_API_KEY=...    # personal access token
-AWS_ENDPOINT_URL=...        # MinIO endpoint
+AWS_ENDPOINT_URL=...        # S3 endpoint (Garage)
 AWS_ACCESS_KEY_ID=...
 AWS_SECRET_ACCESS_KEY=...
 MLFLOW_TRACKING_URI=...          # MLflow tracking server
@@ -334,6 +334,7 @@ With `training.n_eval_folds` capped to 1, only that fold's chunks have a held-ou
 | `src/` | DVC pipeline stages and shared helpers |
 | `dvc.yaml`, `params.yaml` | pipeline definition and tunable parameters |
 | `data_collection/` | everything that runs on the Pi (detector, collector, systemd units) |
+| `firmware/esp32-sense/` | ESP32-S3 firmware: MQTT-triggered recording, on-device int8 inference, S3 upload, OTA (own [README](firmware/esp32-sense/README.md), own `.env.esp32`) |
 | `tests/` | unit tests for the pipeline scripts |
 | `.planning/` | planning docs (requirements, roadmap, state) |
 | `CLAUDE.md` | working notes and gotchas, for whoever touches the pipeline next |
@@ -342,5 +343,7 @@ With `training.n_eval_folds` capped to 1, only that fold's chunks have a held-ou
 
 v1.0 of the on-Pi detector is deployed and working (cross-correlation + MQTT + clip capture).
 The ML pipeline trains a log-mel CNN and exports a 26 KB int8 TFLite model with a 125 KB activation footprint, sized for an ESP32-S3.
+
+The ESP32-S3 firmware (`firmware/esp32-sense/`) runs the int8 CNN on-device, uploads SD recordings to S3 on an MQTT request, and updates itself over WiFi (`./ota.sh`). It was last flashed 2026-11-25 (`681dde9`) after the move to Garage. Its S3 settings live in `firmware/esp32-sense/.env.esp32`, **not** in the root `.env`, and are baked into the binary at build time — see the firmware README before changing storage.
 
 Ideas for later: multiple templates, frequency-domain matching, GPIO button trigger, Prometheus metrics and a fixed holdout so the shipped weights get a held-out score of their own.

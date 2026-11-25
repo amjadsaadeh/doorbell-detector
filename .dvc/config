@@ -3,4 +3,4 @@
     remote = storage
 ['remote "storage"']
     url = s3://doorbell-detector/dvc
-    endpointurl = http://192.168.178.126:9000
+    endpointurl = http://192.168.178.185:3900

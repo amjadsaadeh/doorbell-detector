@@ -8,6 +8,9 @@ pattern-matching detector (`data_collection/detector.py`), deployed as a systemd
 service. Alongside the Pi scripts lives a DVC-managed ML pipeline (`src/`, `dvc.yaml`)
 that pulls labels from Label Studio and raw audio from a self-hosted MinIO S3 bucket,
 trains a small log-mel CNN, and exports an int8 TFLite model sized for an ESP32-S3.
+`firmware/esp32-sense/` is that ESP32-S3 firmware (PlatformIO): MQTT-triggered PDM
+recording to SD, on-device int8 inference, SigV4 upload to S3, OTA. See
+"ESP32 Firmware" below.
 The XGBoost head is still selectable (`training.head`) but is now the baseline, not
 the default. README.md is the human-facing counterpart to this file: it carries the
 full parameter reference and the per-stage command list.
@@ -89,10 +92,12 @@ full parameter reference and the per-stage command list.
   borderline sample the right way); `max_score_deviation` is the metric that moves
   first, and 0.0868 against a 0.5 decision threshold is the real margin to watch.
 
-- **Storage layout:** bucket `doorbell-detector` on MinIO — `raw/` (audio, Label Studio
+- **Storage layout:** bucket `doorbell-detector` on an S3-compatible store (MinIO
+  `192.168.178.126:9000` until 2026-11-25, now Garage `192.168.178.185:3900`, region
+  `garage`; `.dvc/config` already points at Garage) — `raw/` (audio, Label Studio
   source storage), `annotations/` (Label Studio target-storage sync, backup only),
   `dvc/` (DVC remote, configured in `.dvc/config`).
-- **Credentials** live in the git-ignored `.env`: `LABEL_STUDIO_URL`,
+- **Credentials** live in the git-ignored `.env` (the ESP32 has its own, see below): `LABEL_STUDIO_URL`,
   `LABEL_STUDIO_API_KEY`, `AWS_ENDPOINT_URL`, `AWS_ACCESS_KEY_ID`,
   `AWS_SECRET_ACCESS_KEY`, `MLFLOW_TRACKING_URI`, `MLFLOW_TRACKING_USERNAME`,
   `MLFLOW_TRACKING_PASSWORD`. Source it before `dvc repro`/`dvc push`.
@@ -240,6 +245,36 @@ full parameter reference and the per-stage command list.
   is empty for non-pool chunks, and under `--all-chunks` every prediction column is
   empty for chunks no fold held out.
 
+## ESP32 Firmware (`firmware/esp32-sense/`)
+
+Has its own README (setup, serial log, OTA, rollback); the non-obvious parts:
+
+- **It does not read the root `.env` or `AWS_*`.** `build.sh`/`ota.sh` source only
+  `firmware/esp32-sense/.env.esp32` (git-ignored; template `.env.esp32.example`).
+  `platformio.ini` turns its `ESP32_*` vars into `-D` flags, so WiFi, MQTT and S3
+  credentials are **compiled into the binary**. Changing the bucket/endpoint/keys
+  means rebuilding and reflashing. `ESP32_MINIO_BUCKET` is `bucket[/prefix]`
+  (`doorbell-detector/raw`), the endpoint is `host:port` with no scheme.
+- **Moving S3 providers needs a two-sided OTA.** The *running* board fetches its next
+  image with the credentials of the *old* build, so the new image must be built with
+  the new `.env.esp32` but uploaded to the **old** store. `ota.sh` can't do that (it
+  uses one `.env.esp32` for both). Do it by hand: `./build.sh run -e
+  seeed_xiao_esp32s3`, then run `tools/ota_publish.py` with `ESP32_MINIO_ENDPOINT/
+  ACCESS_KEY/SECRET_KEY/REGION` exported from the old store (endpoint without
+  `http://`, region `us-east-1` for MinIO) and `ESP32_FW_VERSION` set. Done once on
+  2026-11-25 (MinIO → Garage, `3faf2df` → `681dde9`).
+- **Watch `doorbell/<ESP32_DEVICE_ID>/status`** (retained) for OTA progress; it is the
+  only visibility off USB. The first attempt of that OTA ended at `rebooting` with no
+  follow-up until a power cycle (back on the old image, no `rolled-back` message);
+  the identical retry succeeded. A silent status is not proof the image is bad.
+- Version is `git describe --always --dirty`; `ota.sh` refuses `-dirty` unless
+  `--allow-dirty`. Untracked files do not make a tree dirty.
+- Model + frontend constants come from `src/prepare_esp32_model.py` (log-mel only,
+  `n_mels=40 n_fft=512 hop=320`; unsupported configs fail before writing) into
+  `lib/doorbell_model/`. The board self-tests inference against host vectors at boot
+  and refuses to detect if parity or arena/latency checks fail.
+- Host tests: `./build.sh test -e native` (sigv4, detection logic).
+
 ## GSD Workflow
 
 This project uses [Get Shit Done](https://github.com/amjadsaadeh/gsd) for structured
@@ -277,7 +312,7 @@ matching, GPIO button trigger, Prometheus metrics/health endpoint.
 - Cross-correlation is slow enough to drop audio in saved clips if not handled carefully (see `c8c2788`)
 - Root `requirements.txt` was removed — `pyproject.toml`/`uv.lock` is the single source
   of pipeline dependencies (`data_collection/requirements.txt` remains for the Pi)
-- All 166 tests pass; run with `PYTHONPATH=./src:. uv run pytest tests/`
+- All 182 tests pass; run with `PYTHONPATH=./src:. uv run pytest tests/`
 
 ## Key Files
 
@@ -307,6 +342,9 @@ matching, GPIO button trigger, Prometheus metrics/health endpoint.
 | `src/provenance.py` | Where a chunk came from: the manifest join every per-chunk diagnostic uses |
 | `src/inspect_dataset.py` | Spotlight inspector: prepare (project env) + show (isolated env) |
 | `src/inspect_dataset.sh` | Runs both halves in order — the entry point |
+| `src/noise_pool.py`, `src/fetch_noise_*.py` | ESC-50 / DEMAND noise pools for augmentation |
+| `src/prepare_esp32_model.py` | Writes the model + librosa-exact frontend tables into the firmware |
+| `firmware/esp32-sense/` | ESP32-S3 firmware (`build.sh`, `ota.sh`, `tools/ota_publish.py`, `.env.esp32`) |
 | `src/tflite_utils.py` | Pure TFLite helpers (wrap, convert, interpret, C array) |
 | `src/quantize_model.py` | int8 conversion + the DVC-tracked calibration set |
 | `src/evaluate_quantized.py` | float-vs-int8 delta, the gate, and its diagnostics |

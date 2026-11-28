@@ -11,6 +11,8 @@ stages:
     deps:
     - data/labeled_data.csv
     - src/convert_labeled_data.py
+    params:
+    - exclude_audio_files
     outs:
     - data/annotation_per_row_data.csv
 

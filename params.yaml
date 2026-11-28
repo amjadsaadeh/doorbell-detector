@@ -1,3 +1,16 @@
+# Audio files that are labeled in Label Studio but absent from the S3 bucket
+# (never copied over in the MinIO -> Garage move). Their annotations are dropped
+# in convert_labeled_data so the dataset matches what can be downloaded. Remove an
+# entry once the file is restored.
+exclude_audio_files:
+  - doorbell_manual_20261004_180546.wav
+  - doorbell_manual_20261004_181350.wav
+  - doorbell_manual_20261004_181552.wav
+  - doorbell_manual_20261004_200545.wav
+  - doorbell_manual_20261004_205715.wav
+  - doorbell_manual_20261007_191919.wav
+  - doorbell_manual_20261007_191941.wav
+
 chunk_size: 2000 # ms
 chunk_overlap: 250 #ms
 inbalance_ratio: 1.0 # How much more background samples should be drawn

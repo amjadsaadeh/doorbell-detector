@@ -10,6 +10,7 @@ from pathlib import PurePosixPath
 from urllib.parse import parse_qs, urlparse
 
 import pandas as pd
+import yaml
 
 
 def normalize_audio_uri(uri: str) -> str:
@@ -141,6 +142,12 @@ if __name__ == "__main__":
     data_file_path = "./data/labeled_data.csv"
     target_file_path = "./data/annotation_per_row_data.csv"
 
+    with open("params.yaml") as f:
+        exclude = set(yaml.safe_load(f).get("exclude_audio_files") or [])
+
     df = pd.read_csv(data_file_path)
     converted_df = annotation_to_sample_per_row(df)
+    dropped = converted_df["audio_file_name"].isin(exclude)
+    print(f"Excluding {dropped.sum()} annotation rows from {len(exclude)} listed files")
+    converted_df = converted_df[~dropped].reset_index(drop=True)
     converted_df.to_csv(target_file_path)

@@ -70,6 +70,7 @@ stages:
     outs:
     - data/augmented_audio
     - data/augmented_annotations.csv
+    - data/lineage/augmentation_lineage.csv
 
   # Which chunks make up the dataset. Deliberately free of any
   # feature_extraction param: every representation trains on the same chunks

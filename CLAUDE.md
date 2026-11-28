@@ -230,6 +230,19 @@ full parameter reference and the per-stage command list.
   stage — it reads pipeline outputs and builds `data/spotlight/`, a git-ignored,
   untracked cache (one wav per chunk, ~110 MB) that can be deleted at any time.
   `prepare` cuts the wavs, `show` serves them; the wrapper runs both.
+- **`src/lineage.py` traces chunks to recordings and rolls errors up to them.**
+  `python src/lineage.py report` joins the OOF table, the manifest and
+  `data/lineage/augmentation_lineage.csv` into `data/lineage_report/` (git-ignored):
+  `index.html` (FP-prone recordings, FN-prone recordings, doorbell files whose mixes get
+  missed by SNR, noise files that break mixes, every error chunk), plus
+  `recording_profile.csv` (one row per file across its three roles: own chunks, signal
+  source, noise source) and `chunk_lineage.csv`. `lineage.py trace <row_index|annotation_id>`
+  prints one chunk's chain. The lineage CSV is an `augmentation` output because only that
+  stage knows which noise file/offset/roll/gain went into each mix; it is a *separate*
+  file so recording it cannot change the chunks. Its paths live in `src/lineage_paths.py`,
+  **not** `paths.py`: `paths.py` is a dep of the training stages, so touching it
+  invalidates the ~90 min `train_model` cache. Synthetic errors are charged to the
+  signal recording and the noise file, never the `aug_*.wav`.
 - **Spotlight is what dragged `librosa` to 0.11 and `pyarrow` to 24** (plus
   `dill` down to <0.3.9, which HuggingFace `datasets` requires). Bumping a
   feature-extraction dependency under a cached dataset is a silent-corruption risk,
@@ -341,6 +354,7 @@ matching, GPIO button trigger, Prometheus metrics/health endpoint.
 | `src/oof.py` | Held-out per-chunk predictions collected across the CV folds |
 | `src/provenance.py` | Where a chunk came from: the manifest join every per-chunk diagnostic uses |
 | `src/inspect_dataset.py` | Spotlight inspector: prepare (project env) + show (isolated env) |
+| `src/lineage.py`, `src/lineage_paths.py` | Chunk → recording lineage; per-recording FP/FN profile report (`data/lineage_report/`) |
 | `src/inspect_dataset.sh` | Runs both halves in order — the entry point |
 | `src/noise_pool.py`, `src/fetch_noise_*.py` | ESC-50 / DEMAND noise pools for augmentation |
 | `src/prepare_esp32_model.py` | Writes the model + librosa-exact frontend tables into the firmware |

@@ -332,8 +332,8 @@ stages:
       nfiles: 1920
     - path: src/augment_data.py
       hash: md5
-      md5: 84ad3989a2d84c7944a94d6fe4e878f9
-      size: 10578
+      md5: b8a3095722db8eeff4d4d55d269fdb11
+      size: 12218
     params:
       params.yaml:
         augmentation:
@@ -362,6 +362,10 @@ stages:
       md5: ba0dc25d1cecb36d606f39a3257fca83.dir
       size: 271674648
       nfiles: 4242
+    - path: data/lineage/augmentation_lineage.csv
+      hash: md5
+      md5: 461fde7430e09eb280147c5aeceb622e
+      size: 475621
   fetch_noise_demand:
     cmd: python src/fetch_noise_demand.py
     deps:

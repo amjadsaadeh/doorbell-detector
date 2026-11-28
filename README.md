@@ -302,6 +302,11 @@ Metrics say *how often* the model is wrong. To find out *which* chunks it gets w
 ./src/inspect_dataset.sh                 # held-out predictions, audio, spectrograms
 ./src/inspect_dataset.sh --embeddings    # + a similarity map of the CNN's embeddings
 ./src/inspect_dataset.sh --all-chunks    # include chunks no fold held out
+
+# Which recordings are prone to which error? (writes data/lineage_report/index.html)
+uv run python src/lineage.py report
+uv run python src/lineage.py trace 1234              # one chunk back to its recordings
+uv run python src/lineage.py trace aug_snr-5_12_1    # a synthetic mix: signal + noise files
 ```
 
 It opens [Renumics Spotlight](https://github.com/Renumics/spotlight) in a browser: one row per chunk, a filterable table, and an audio player plus spectrogram for whichever row you select. The table opens sorted with the errors first, most-confident-mistake at the top — a chunk the model was *sure* about and still got wrong is usually either genuinely hard or mislabeled.

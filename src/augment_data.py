@@ -15,6 +15,7 @@ import numpy as np
 import pandas as pd
 import soundfile as sf
 import yaml
+from lineage_paths import AUGMENTATION_LINEAGE
 from pydub import AudioSegment
 from pydub.utils import mediainfo
 from tqdm import tqdm
@@ -35,9 +36,13 @@ def load_mono_samples(audio_path: Path) -> tuple[np.ndarray, int]:
     return samples, audio.frame_rate
 
 
-def extract_windows(df: pd.DataFrame, chunk_size_ms: int, chunk_overlap_ms: int) -> list[tuple[np.ndarray, str]]:
+def extract_windows(
+    df: pd.DataFrame, chunk_size_ms: int, chunk_overlap_ms: int
+) -> list[tuple[np.ndarray, str, int]]:
     """Slides a chunk_size_ms window (stepping by chunk_overlap_ms) over every
-    labeled span in df and returns (raw sample array, source file name) pairs.
+    labeled span in df and returns (raw sample array, source file name,
+    window start in ms) triples. The start offset is what lets the lineage
+    table say *where in* the recording a mixed sample's doorbell came from.
     Mirrors the windowing convention in draw_data.py so augmented chunks line
     up with real ones. The source file name becomes the split_group of the
     mixed sample, so augmented variants never straddle a group-aware
@@ -60,7 +65,7 @@ def extract_windows(df: pd.DataFrame, chunk_size_ms: int, chunk_overlap_ms: int)
                 start_sample = int(samples_per_ms * chunk_start_ms)
                 window = samples[start_sample : start_sample + chunk_len_samples]
                 if len(window) == chunk_len_samples:
-                    windows.append((window, audio_file_name))
+                    windows.append((window, audio_file_name, chunk_start_ms))
 
     return windows
 
@@ -197,19 +202,28 @@ if __name__ == "__main__":
 
     rng = random.Random(42)
     rows = []
+    # One row per mixed sample, keyed by the same id as augmented_annotations.csv.
+    # The manifest only keeps the signal's file (split_group) and the noise
+    # *pool*; this records the rest of the recipe -- which noise file, where in
+    # it, and the random draws -- so a mix can be traced to every recording it
+    # was built from. A separate output (not extra columns above) so the
+    # recorded lineage cannot change the chunks or invalidate training.
+    lineage_rows = []
 
     for snr_db in snrs_db:
-        for signal_idx, (signal, signal_source) in enumerate(
+        for signal_idx, (signal, signal_source, signal_start_ms) in enumerate(
             tqdm(signal_windows, desc=f"Mixing at {snr_db}dB SNR")
         ):
             for pair_idx in range(pairs_per_signal_chunk):
                 # Pool first, then window: equal weight per pool regardless
                 # of pool size, so real background stays represented
                 noise_pool_name = rng.choice(pool_names)
-                noise = draw_noise_window(rng.choice(noise_pools[noise_pool_name]))
+                noise_entry = rng.choice(noise_pools[noise_pool_name])
+                noise = draw_noise_window(noise_entry)
                 # Circularly shift the noise so repeated draws of the same
                 # background chunk don't always align identically with the bell
-                noise = np.roll(noise, rng.randrange(len(noise)))
+                noise_roll = rng.randrange(len(noise))
+                noise = np.roll(noise, noise_roll)
                 mixed = mix_at_snr(signal, noise, snr_db)
                 # Loudness jitter: vary absolute level (SNR is unaffected since
                 # both terms scale equally) so synthetic positives don't all sit
@@ -222,6 +236,20 @@ if __name__ == "__main__":
 
                 sample_id = f"aug_snr{snr_db}_{signal_idx}_{pair_idx}"
                 file_name = f"{sample_id}.wav"
+                lineage_rows.append(
+                    {
+                        "annotation_id": sample_id,
+                        "signal_file": signal_source,
+                        "signal_start_ms": signal_start_ms,
+                        "noise_pool": noise_pool_name,
+                        "noise_file": noise_entry[0].name,
+                        # Pools are 16 kHz mono by construction (SAMPLE_RATE).
+                        "noise_start_ms": round(noise_entry[1] * 1000 / SAMPLE_RATE),
+                        "noise_roll_samples": noise_roll,
+                        "snr_db": snr_db,
+                        "gain_db": round(gain_db, 3),
+                    }
+                )
 
                 mixed_audio = AudioSegment(
                     mixed.astype(np.int16).tobytes(),
@@ -252,3 +280,5 @@ if __name__ == "__main__":
                 )
 
     pd.DataFrame(rows).to_csv(OUTPUT_ANNOTATIONS_FILE, index=False)
+    AUGMENTATION_LINEAGE.parent.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame(lineage_rows).to_csv(AUGMENTATION_LINEAGE, index=False)
